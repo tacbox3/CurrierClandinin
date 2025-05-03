@@ -41,48 +41,6 @@ flick_resamp_t = np.arange(0, 14-0.8, 1/5)
 flick_freqs = [0.1,0.5,1,2]
 
 
-
-#%% Dataset statistics table
-
-ucells = np.unique(scraped_log[:,1])
-utype_indices = np.unique(scraped_log[:,14]) != ''
-utypes = np.unique(scraped_log[:,14])[utype_indices]
-
-typeNs = np.zeros(len(utypes))
-typeROIs = np.zeros(len(utypes))
-table1 = np.zeros((len(utypes),3),dtype='int')
-# genotypes = np.full(len(utypes),'',dtype='<U103')
-
-for t in range(0,len(utypes)):
-    type = utypes[t]
-    ROIs = scraped_log[scraped_log[:,14] == type,1]
-    cells = np.unique(ROIs)
-    typeROIs[t] = len(ROIs)
-    typeNs[t] = len(cells)
-    typeFlies = np.full(len(ROIs), '', dtype='<U103')
-    for roi_ind in range(0,len(ROIs)):
-        typeFlies[roi_ind] = ROIs[roi_ind][:6]
-    typeFlies = np.unique(typeFlies)
-    # fill in table
-    table1[t,0] = typeROIs[t]
-    table1[t,1] = typeNs[t]
-    table1[t,2] = len(typeFlies)
-
-print(str(len(ucells)) + ' unique neurons over ' + str(len(scraped_log[:,1])) + ' ROIs')
-print(str(len(ucells)-len(scraped_log[:,1][scraped_log[:,14] == ''])) + ' cells identified')
-print(str(len(utypes)) + ' cell types represented')
-print(str(len(np.where(typeNs>1)[0])) + ' cell types @ N=2 or more (' + str(len(np.where(typeROIs>1)[0])) + ' by ROIs)')
-print(str(len(np.where(typeNs>2)[0])) + ' cell types @ N=3 or more (' + str(len(np.where(typeROIs>2)[0])) + ' by ROIs)')
-print(str(len(np.where(typeNs>4)[0])) + ' cell types @ N=5 or more (' + str(len(np.where(typeROIs>4)[0])) + ' by ROIs)')
-
-utypes[typeROIs<3]
-
-#%% write table to CSV
-with open('/Users/tcurrier/Desktop/Clandinin Lab/Papers/Clandinin/CurrierClandinin/Medulla Imaging/Tables/Table1.csv', mode='w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerows(table1)
-    f.close
-
 #%% Plot summary PDFs for each unique cell type in the dataset. Takes about 2 sec per cell type to run
 
 # disable runtime and deprecation warnings - dangerous! turn this off while working on the function
@@ -204,26 +162,12 @@ for ind in range(0,len(unique_types)):
     axs0 = subfigs[0].subplots(2, 11)
     tp = np.arange(50,60,1)
 
-    # # optional log coloraxis rescaling - need to adjust STRF plot section if using this
-    # # define square-root-rescaled STRFs
-    # logblue_STRF = np.where(mean_STRF[:,:,:,0]<0, -1*np.sqrt(-1*mean_STRF[:,:,:,0]), np.sqrt(mean_STRF[:,:,:,0]))
-    # loguv_STRF = np.where(mean_STRF[:,:,:,1]<0, -1*np.sqrt(-1*mean_STRF[:,:,:,1]), np.sqrt(mean_STRF[:,:,:,1]))
-    # # define max and min values
-    # maxval = np.nanmax([np.nanmax(logblue_STRF),np.nanmax(loguv_STRF)])
-    # minval = np.nanmin([np.nanmin(logblue_STRF),np.nanmin(loguv_STRF)])
-    # # low threshold placed at the edge of the larger of these two values
-    # rangemax = np.nanmax([maxval,np.abs(minval)])
-
     # rescale plots relative to peak
     rangemax = np.max([np.round(np.max(np.abs(mean_STRF[20:60,20:60,:,:])),1),1])
 
     for n in range(0,10):
         x = plt.subplot(2,11,(n+1));
         plt.imshow(mean_STRF[20:60,20:60,int(tp[n]),0]/rangemax, origin='lower', cmap='PiYG', clim=[-1,1]);
-        # unnormalized version
-        # plt.imshow(mean_STRF[20:60,20:60,int(tp[n]),0], origin='lower', cmap='PiYG', clim=[-1*rangemax,rangemax]);
-        # logscale version
-        # plt.imshow(logblue_STRF[20:60,20:60,int(tp[n])], origin='lower', cmap='PiYG', clim=[-1*rangemax,rangemax]);
         plt.title(str(np.round((-3+((tp[n]))/20),2))+' s')
         x.axes.get_xaxis().set_ticks([])
         if n != 0:
@@ -243,10 +187,6 @@ for ind in range(0,len(unique_types)):
     for n in range(0,10):
         x = plt.subplot(2,11,(n+12));
         plt.imshow(mean_STRF[20:60,20:60,int(tp[n]),1]/rangemax, origin='lower', cmap='PiYG', clim=[-1,1]);
-        # unnormalized version
-        # plt.imshow(mean_STRF[20:60,20:60,int(tp[n]),1], origin='lower', cmap='PiYG',clim=[-1*rangemax,rangemax]);
-        # logscale version
-        # plt.imshow(loguv_STRF[20:60,20:60,int(tp[n])], origin='lower', cmap='PiYG',clim=[-1*rangemax,rangemax]);
         x.axes.get_xaxis().set_ticks([0,40])
         x.axes.get_xaxis().set_ticklabels(['20','60'])
         if n != 0:
@@ -399,31 +339,6 @@ for ind in range(0,len(unique_types)):
     fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/individual cell types/'+label+'.pdf'
     sumfig.savefig(fname, format='pdf', orientation='landscape')
     plt.close()
-
-
-#%% spatial slice workshop
-# define angles of slices to take through the mean SRF. 180-360 are mirrored versions of 0-180, so if there is a non-symmetry, this analysis will erase it on average
-rotangles = np.arange(0,180,10)
-# container for slice data
-slices = np.zeros((len(rotangles),blue_SRF.shape[1]))
-# spin SRF and grab slice from same index each time
-for n in range(0,len(rotangles)):
-    slices[n,:] = ndimage.rotate(blue_SRF,rotangles[n],reshape=False)[40,:]
-# normalize slices to peak
-slices = slices/np.max(np.abs(slices))
-
-# plotting
-plt.plot(np.mean(slices, axis=0), color=[0,0,1])
-# plt.plot(slices.T, color=[0,0,1], linewidth=0.5)
-plt.plot(np.mean(slices, axis=0)+np.std(slices, axis=0), color=[0,0,1], linewidth=0.5)
-plt.plot(np.mean(slices, axis=0)-np.std(slices, axis=0), color=[0,0,1], linewidth=0.5)
-plt.plot([0,80],[0,0],'k:')
-
-#%%
-plt.imshow(ndimage.rotate(blue_SRF,30,reshape=False), cmap='PiYG', clim=[-0.5,0.5])
-plt.imshow(blue_SRF, cmap='PiYG', clim=[-1,1])
-
-
 
 #%% remove rows containing zeros from flattened mean response matrix and save it. the removed rows correspond to cell types for which the mean response was missing some part of the data
 culled_small_flat = mean_small_flat_resp[np.unique(np.nonzero(mean_small_flat_resp)[0]),:]
