@@ -10,10 +10,11 @@ Code base for "Infrequent strong connections constrain connectomic predictions o
 A few helper functions for interacting with .hdf5 metadata files
 
 ## Scripts
-- The core analysis code for the manuscript lives in the scripts beginning with `ME_`. Please note that some of these scripts will require the connectome data deposited with the physiology data on Dryad (see **Raw Data Availability**, below)
+- The core analysis code for the manuscript lives in the scripts beginning with `ME_`. Comments at the beginning of each script detail its function. Please note that some scripts will require the connectome data deposited with the physiology data on Dryad (see **Raw Data Availability**, below).
+- `ALL_RESPONSES.npy` (available to download on Dryad) contains responses generated via sequential runs of `ME_import_save.py` and `ME_load_center.py`. Users not wishing to re-analyze all raw imaging data are encouraged to work from `ALL_RESPONSES.npy`. Note that this dictionary will need to be broken into standalone variables for the subsequent code to run (i.e., `ME_analyze_plt.py`).
 - `recover_isotropy.py` and `var_brain.py` are not run in any `ME_` scripts, but are included for completeness - these are run as part of the preprocessing pipeline that also includes motion correction (performed with [brainsss](https://github.com/ClandininLab/brainsss))
 - `save_strfs.py` is a callable script that creates STRF movies for a given recording series
-- **WARNING!** The path structure of the included scripts are **not** internally consistent, and will need to be renamed based on the location you put each element (raw data, scripts, logs, connectome data, saved .npy summary variables)
+- **WARNING!** The path structure of the included scripts are **not** internally consistent. All paths will need to be redefined by the user based on the location of each programmatic element (raw data, scripts, logs, connectome data, and saved .npy summary variables)
 
 # Required packages
 The following packages are required to run the scripts:
@@ -27,7 +28,7 @@ The following packages are required to run the scripts:
 - matplotlib
 
 # Raw Data Availability
-Raw Data, including STRFs for all recorded neurons, can be downloaded on Dryad at the following DOIs. The ImagingData files available for download have been preprocessed (see **Scripts**, above)
+Raw Data, including STRFs for all recorded neurons, can be downloaded on Dryad at the following DOIs. The ImagingData files available for download have been minimally preprocessed (see **Scripts**, above)
 - [10.5061/dryad.pg4f4qs1j]() *(this is the main deposition)*
 - [10.5061/dryad.bnzs7h4ns]()
 - [10.5061/dryad.kh18932k1]()
