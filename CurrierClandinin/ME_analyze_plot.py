@@ -1,3 +1,5 @@
+# This script loads individually pre-redered and pre-centered responses and performs group analysis, including by-cell-type summary plotting.
+
 from visanalysis.analysis import imaging_data, shared_analysis
 import matplotlib.pyplot as plt
 import numpy as np
@@ -345,65 +347,6 @@ culled_small_flat = mean_small_flat_resp[np.unique(np.nonzero(mean_small_flat_re
 included_labels = unique_types[np.unique(np.nonzero(mean_small_flat_resp)[0])]
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/culled_flattened_small_label_means.npy', culled_small_flat)
 
-#%% mean TRF (blue,UV) by cell type
-thresh_n = 0
-
-# pull list of unique cell type labels
-utype_indices = np.unique(scraped_log[1:,14]) != ''
-unique_types = np.unique(scraped_log[1:,14])[utype_indices]
-
-# save copy of mean TRFs for Alex's modeling - axes are t, c, type
-all_mean_TRFs = np.zeros((60,2,len(unique_types)))
-
-filtfig = plt.figure(figsize=(20, 20))
-pltcnt=0
-# plt.suptitle('Mean Center Filters for N>=3 Cell Types')
-for ind in range(0,len(unique_types)):
-    # define cell type to summarize
-    label = unique_types[ind]
-    # grab responses at indices where label matches cell type column
-    label_STRFs = all_centered_STRFs[:,:,:,:,scraped_log[:,14] == label]
-    n_cells = label_STRFs.shape[4]
-    if n_cells > thresh_n:
-        # defining TRF based on argmax of centered core (peak responding pixel in STRF center)
-        label_cores = all_centered_cores[:,:,:,scraped_log[:,14] == label]
-        label_TRFs = np.zeros(label_STRFs.shape[2:5])
-        # grab the larger weight core that was actually used for centering, and find max
-        for cell in range(0,n_cells):
-            if np.abs(np.nansum(label_cores[:,:,0,cell],axis=(0,1))) > np.abs(np.nansum(label_cores[:,:,1,cell],axis=(0,1))):
-                current_core = label_cores[:,:,0,cell].flatten()
-                SRF_center_ind = np.argmax(np.abs(current_core))
-                # take full timecourse for the max responding pixel
-                label_TRFs[:,0,cell] = label_STRFs.reshape(-1,60,2,n_cells)[SRF_center_ind,:,0,cell]
-                label_TRFs[:,1,cell] = label_STRFs.reshape(-1,60,2,n_cells)[SRF_center_ind,:,1,cell]
-            else:
-                current_core = label_cores[:,:,1,cell].flatten()
-                SRF_center_ind = np.argmax(np.abs(current_core))
-                label_TRFs[:,0,cell] = label_STRFs.reshape(-1,60,2,n_cells)[SRF_center_ind,:,0,cell]
-                label_TRFs[:,1,cell] = label_STRFs.reshape(-1,60,2,n_cells)[SRF_center_ind,:,1,cell]
-        # write to output container
-        label_TRFs = np.nanmean(label_TRFs,axis=2)
-        all_mean_TRFs[:,:,ind] = label_TRFs
-        # plot
-        rangemax = np.max([np.round(np.max(np.abs(label_TRFs)))+0.4,1]) #uses sliding cap w/ 1 as minimum
-        plt.subplot(12,8,pltcnt+1)
-        plt.plot(label_TRFs[30:,0],color=[0.1,0.2,0.8],linewidth=2)
-        plt.plot(label_TRFs[30:,1],color=[1,0,1],linewidth=2)
-        plt.plot([0,30],[0,0],'k:')
-        plt.text(2,0.7,label,fontsize='large')
-        plt.ylim([-1*rangemax,rangemax])
-        pltcnt = pltcnt+1
-
-# save means by cell type and cell type list
-np.save('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/all_mean_TRFs.npy', all_mean_TRFs)
-np.save('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/labels.npy', unique_types)
-
-# save as PDF
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/all_mean_filters.pdf'
-# fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/n' + str(thresh_n) + '_mean_filters.pdf'
-filtfig.savefig(fname, format='pdf', orientation='portrait')
-
-
 #%% Cross-type summary statistics: flicker modulation depth, orientation tuning index, TRF FW@HM, TRF num lobes, TRF last lobe sign, SRF center size, ...
 
 # load pre-calculated metrics
@@ -457,11 +400,8 @@ for cell_ind in range(0,scraped_log.shape[0]):
     cell_STRFs = all_centered_STRFs[:,:,:,:,cell_ind]
     buc_STRF = all_blue_resp[:,:,:,cell_ind]
     uvuc_STRF = all_uv_resp[:,:,:,cell_ind]
-    # cell_STRFs = all_rotated_STRFs[:,:,:,:,cell_ind]
     # defining TRF based on argmax of centered core (peak responding pixel in STRF center)
     cell_core = all_centered_cores[:,:,:,cell_ind]
-    # cell_core = all_rotated_cores[:,:,:,cell_ind]
-    # cell_surround_masks = all_rotated_surrounds[:,:,:,cell_ind]
     cell_surround_masks = all_centered_surrounds[:,:,:,cell_ind]
     cell_TRFs = np.zeros(cell_STRFs.shape[2:4])
     cell_surr_TRFs = np.zeros(cell_STRFs.shape[2:4])
@@ -593,7 +533,6 @@ for cell_ind in range(0,scraped_log.shape[0]):
     # spatial and temporal frequency power spectra
     for c in range(0,2):
         # calculate 1-D spatial power spectrum using Max's method
-        # fft_2d = np.abs(np.fft.fftshift(np.fft.fft2(image_array[:, :512])))**2
         fft_2d = np.abs(np.fft.fftshift(np.fft.fft2(cell_SRFs[:,:,c])))**2
         ndim = fft_2d.shape[0]
         pixels_per_degree = 1
@@ -740,14 +679,6 @@ np.save('/Volumes/TBD/Bruker/STRFs/compiled/culled_flicker_DCs.npy', flick_DCs[:
 
 #%% cull and save spatial metrics
 
-# spatial_metrics = []
-# spatial_metrics = np.append([np.unique(np.nonzero(all_flat_resp)[0])], center_areas[np.unique(np.nonzero(all_flat_resp)[0])])
-# spatial_metrics = np.append(spatial_metrics, long_axes[np.unique(np.nonzero(all_flat_resp)[0])])
-# spatial_metrics = np.append(spatial_metrics, short_axes[np.unique(np.nonzero(all_flat_resp)[0])])
-#
-# spatial_metrics = np.reshape(spatial_metrics,(-1,len(np.unique(np.nonzero(all_flat_resp)[0]))))
-#
-# np.save('/Volumes/TimBigData/Bruker/STRFs/compiled/culled_spatial_metrics.npy', spatial_metrics)
 spatial_metrics = []
 spatial_metrics = np.append(orient_selects, center_areas)
 spatial_metrics = np.append(spatial_metrics, ellipse_areas)
@@ -756,8 +687,7 @@ spatial_metrics = np.append(spatial_metrics, short_axes)
 
 spatial_metrics = np.reshape(spatial_metrics,(-1,scraped_log.shape[0]))
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_spatial_metrics.npy', spatial_metrics)
-# NEXT: calculate nonlinearity for each neuron; add to overall flicker summary figure (plot each cell's nonlinearity as a line in an imshow)
-# 3: by cluster or cell type spatial and temporal numbers
+
 
 #%% cull and save STRF and flicker data
 
@@ -771,8 +701,7 @@ np.save('/Volumes/TBD/Bruker/STRFs/compiled/culled_shifts.npy', all_shifts[:,np.
 
 
 #%% temporal summary figure
-# to try: plot power spectrum as an image, sorted by peak location
-# to try: temporal filters as an image, sorted by zero crossing time?
+
 utype_indices = np.unique(scraped_log[:,14]) != ''
 unique_types = np.unique(scraped_log[:,14])[utype_indices]
 
@@ -808,15 +737,6 @@ plt.scatter(before_zc_auc[1,:],after_zc_auc[1,:],s=10,color=[0.8,0.1,0.1])
 plt.ylabel('Last Lobe AUC')
 plt.xlabel('Before Last Lobe AUC')
 
-
-# plt.subplot(2,3,3)
-# plt.xlim(-0.5,10)
-# plt.plot([-0.5,10],[0,0],'k--',linewidth=0.5)
-# plt.scatter(pref_tfs,after_zc_auc[0,:]-before_zc_auc[0,:],s=10,color=[0.1,0.1,0.8])
-# plt.scatter(pref_tfs,after_zc_auc[1,:]-before_zc_auc[1,:],s=10,color=[0.8,0.1,0.1])
-# plt.ylabel('AUC difference (last lobe - before)')
-# plt.xlabel('Preferred TF')
-
 plt.subplot(2,3,4)
 tf_hist = np.histogram(pref_tfs_surr,bins=30,range=(0,10))
 tf_norm = tf_hist[0]/np.sum(tf_hist[0])
@@ -837,17 +757,9 @@ plt.plot(uvpi_hist[1][1:],uvpi_norm,color=[0.8,0.5,0.2]);
 plt.ylabel('Probability')
 plt.xlabel('Spectral Preference Index')
 
-# plt.subplot(2,3,5)
 tf_vec = tfreq[1:]
 norm_nt_ps = (1/tfreq[1:])/np.sum(1/tfreq[1:])
 mean_temp_ps = np.nanmean(psdt,axis=(1,2))
-# plt.loglog(tfreq,mean_temp_ps)
-# # plt.loglog(tfreq,psdt[:,1,327])
-# # plt.loglog(tfreq,psdt[:,1,327])
-# plt.loglog(tf_vec,norm_nt_ps,'k-')
-# plt.ylabel('Log(Norm. Power)')
-# plt.xlabel('Temporal Frequency')
-
 plt.subplot(2,3,3)
 plt.loglog(tf_vec,norm_nt_ps,'k-')
 mean_label_spectrum = np.zeros((psdt.shape[0],len(unique_types)))
@@ -865,7 +777,6 @@ plt.title('Temporal Spectra of RF Surrounds')
 plt.subplot(2,3,6)
 plt.loglog(tf_vec,norm_nt_ps,'k-')
 mean_label_spectrum = np.zeros((psdt.shape[0],len(unique_types)))
-# for ind in range(0,1):
 for ind in range(0,len(unique_types)):
     current_label = unique_types[ind]
     label_spectra = psdt[:,:,scraped_log[:,14] == current_label]
@@ -882,185 +793,7 @@ plt.title('Temporal Spectra of RF Centers')
 # save it
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/temporal_summary.pdf'
 tempfig.savefig(fname, format='pdf', orientation='landscape')
-#%% By cell type / advanced temporal summary for RF centers
 
-# this value determines the threshold for N that will be required to include a cell type in summary plots (non-inclusive lower bound)
-thresh_n = 2
-
-utype_indices = np.unique(scraped_log[:,14]) != ''
-unique_types = np.unique(scraped_log[:,14])[utype_indices]
-classmarkers = np.zeros(len(unique_types))
-signmarkers = np.zeros(len(unique_types))
-Nbytype = np.zeros(len(unique_types))
-
-mean_label_spectrum = np.zeros((psdt.shape[0],2,len(unique_types)))
-uvpi_means = np.zeros(len(unique_types))
-
-tempfig = plt.figure(figsize=(15, 15))
-plt.suptitle('Temporal Summary for RF Centers, by Cell Type (N>=3)',fontsize='xx-large', fontweight='bold')
-# build axes
-plt.subplot(3,3,1,aspect=0.6)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.plot([-20,20],[20,-20],'k--',linewidth=0.5)
-plt.xlim(-20,20)
-plt.ylim(-30,30)
-plt.ylabel('Last Lobe AUC')
-plt.xlabel('Before Last Lobe AUC')
-plt.text(-15,25,'ON', fontsize='large', fontweight='demibold')
-plt.text(-8,-9,'Differentiators', fontsize='large', fontweight='demibold', rotation=-30)
-plt.text(10,-27,'OFF', fontsize='large', fontweight='demibold')
-plt.text(-7,-24,'Integrators', fontsize='large', fontweight='demibold')
-plt.text(-7,22,'Integrators', fontsize='large', fontweight='demibold')
-plt.text(-17,1,'Delayed', fontsize='large', fontweight='demibold')
-plt.text(-19,-3,'Integrators', fontsize='large', fontweight='demibold')
-plt.text(8,1,'Delayed', fontsize='large', fontweight='demibold')
-plt.text(6,-3,'Integrators', fontsize='large', fontweight='demibold')
-
-plt.subplot(3,3,2,aspect=0.6)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.plot([-20,20],[20,-20],'k--',linewidth=0.5)
-plt.xlim(-8,8)
-plt.ylim(-12,12)
-plt.title('Blue')
-plt.ylabel('Last Lobe AUC')
-plt.xlabel('Before Last Lobe AUC')
-plt.subplot(3,3,3,aspect=0.6)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.plot([-20,20],[20,-20],'k--',linewidth=0.5)
-plt.xlim(-8,8)
-plt.ylim(-12,12)
-plt.title('UV')
-plt.ylabel('Last Lobe AUC')
-plt.xlabel('Before Last Lobe AUC')
-
-plt.subplot(3,3,4)
-plt.xlim(-1,1)
-plt.ylim(-1,1)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-20,20],'k--',linewidth=0.5)
-plt.ylabel('Center Spectral Index')
-plt.xlabel('Surround Spectral Index')
-
-
-
-for ind in range(0,len(unique_types)):
-    # pull summary measurements for current cell type
-    current_label = unique_types[ind]
-    current_cells = scraped_log[scraped_log[:,14] == current_label,1]
-    current_n = len(current_cells)
-    Nbytype[ind] = current_n
-
-    if current_n > thresh_n:
-        # temporal spectrum
-        label_spectra = psdt[:,:,scraped_log[:,14] == current_label]
-        mean_label_spectrum[:,:,ind] = np.nanmean(label_spectra,axis=2)
-        # preferred freq
-        label_prefTFs = pref_tfs[scraped_log[:,14] == current_label]
-        # TFmeans[ind,2] = np.nanmean(label_prefTFs)
-        # AUCs
-        label_BLLauc = before_zc_auc[:,scraped_log[:,14] == current_label]
-        label_LLauc = after_zc_auc[:,scraped_log[:,14] == current_label]
-        label_uvpi_center = uvpi_center[scraped_log[:,14] == current_label]
-        uvpi_means[ind] = np.nanmedian(label_uvpi_center)
-        label_uvpi_surr = uvpi_surr[scraped_log[:,14] == current_label]
-        blue_sem = np.mean([np.std(label_BLLauc[0,:])/np.sqrt(current_n),np.std(label_LLauc[0,:])/np.sqrt(current_n)])
-        uv_sem = np.mean([np.std(label_BLLauc[1,:])/np.sqrt(current_n),np.std(label_LLauc[1,:])/np.sqrt(current_n)])
-
-        # define plot color based on cell class, and tag marker vector
-        if np.logical_or(np.logical_or(current_label[0]=='P',current_label[0]=='D'),current_label[0]=='S'):
-            plot_color=[0.8,0.2,0.8]
-            classmarkers[ind] = 3
-            # plt.subplot(339)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        elif np.logical_or(current_label[0]=='C',current_label[0]=='Y'):
-            plot_color=[0.2,0.8,0.2]
-            classmarkers[ind] = 2
-            # plt.subplot(338)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        else:
-            plot_color=[0,0,0]
-            classmarkers[ind] = 1
-            # plt.subplot(337)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        # manual correction for LMa's and Olt
-        if np.logical_or(current_label[0:1]=='LM',current_label[0:1]=='Ol'):
-            plot_color=[0.8,0.2,0.8]
-            classmarkers[ind] = 3
-            # plt.subplot(339)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-
-        # plot spectra based on sign of last lobe AUC
-        if np.sign(np.nanmedian(label_LLauc)) == 1:
-            signmarkers[ind] = 1
-            # Spectral selectivity index - AUC diff blue-UV
-            plt.subplot(3,3,4)
-            plt.scatter(np.nanmean(label_uvpi_surr), np.nanmean(label_uvpi_center), color=[0.8,0.1,0.1], s=2+400*current_n/61, alpha=0.9-uv_sem/4)
-            # plt.subplot(337)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        else:
-            signmarkers[ind] = -1
-            # Spectral selectivity index - center vs surround means
-            plt.subplot(3,3,4)
-            plt.scatter(np.nanmean(label_uvpi_surr), np.nanmean(label_uvpi_center), color=[0.1,0.1,0.8], s=2+400*current_n/61, alpha=0.9-uv_sem/4)
-            # plt.subplot(338)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-
-
-        # basic AUC scatter
-        plt.subplot(3,3,2,aspect=0.6)
-        plt.scatter(np.nanmedian(label_BLLauc[0,:]),np.nanmedian(label_LLauc[0,:]), color=[0.2,0.2,0.2], s=20)
-        plt.subplot(3,3,3,aspect=0.6)
-        plt.scatter(np.nanmedian(label_BLLauc[1,:]),np.nanmedian(label_LLauc[1,:]), color=[0.2,0.2,0.2], s=20)
-        # size/class/variance modulated AUC scatter
-        # plt.subplot(3,3,2,aspect=0.6)
-        # plt.scatter(np.nanmean(label_BLLauc[0,:]),np.nanmean(label_LLauc[0,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-blue_sem/4)
-        # plt.subplot(3,3,3,aspect=0.6)
-        # plt.scatter(np.nanmean(label_BLLauc[1,:]),np.nanmean(label_LLauc[1,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-uv_sem/4)
-
-        # # Integration index - LL+BLL
-        # plt.subplot(3,3,5)
-        # plt.scatter(np.nanmean(label_prefTFs),np.nanmean(label_LLauc[0,:])+np.nanmean(label_BLLauc[0,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-blue_sem/5)
-        # plt.subplot(3,3,6)
-        # plt.scatter(np.nanmean(label_prefTFs),np.nanmean(label_LLauc[1,:])+np.nanmean(label_BLLauc[1,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-blue_sem/5)
-
-plt.subplot(3,3,5)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.ylabel('Log(Norm. Power)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,0,np.logical_and(signmarkers == 1, Nbytype > thresh_n)],axis=(1)),color=[0.8,0.1,0.1],linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,0,np.logical_and(signmarkers == -1, Nbytype > thresh_n)],axis=(1)),color=[0.1,0.1,0.8],linewidth=2)
-
-plt.subplot(3,3,6)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,1,np.logical_and(signmarkers == 1, Nbytype > thresh_n)],axis=1),color=[0.8,0.1,0.1],linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,1,np.logical_and(signmarkers == -1, Nbytype > thresh_n)],axis=1),color=[0.1,0.1,0.8],linewidth=2)
-
-plt.subplot(3,3,7)
-plt.ylim(0.01,0.15)
-plt.ylabel('Log(Norm. Power)')
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 1, Nbytype > thresh_n)],axis=(1,2)), color=[0,0,0], linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 1, Nbytype > thresh_n)],axis=(1)), color=[0,0,0], linewidth=0.5, alpha=0.3)
-
-plt.subplot(3,3,8)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 2, Nbytype > thresh_n)],axis=(1,2)), color=[0.2,0.8,0.2], linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 2, Nbytype > thresh_n)],axis=(1)), color=[0.2,0.8,0.2], linewidth=0.5, alpha=0.5)
-
-plt.subplot(3,3,9)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 3, Nbytype > thresh_n)],axis=(1,2)), color=[0.8,0.2,0.8], linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 3, Nbytype > thresh_n)],axis=(1)), color=[0.8,0.2,0.8], linewidth=0.5, alpha=0.4)
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/CENTERS_auc_spectrum_byType.pdf'
-tempfig.savefig(fname, format='pdf', orientation='portrait')
 #%% spectral preference index by cell type
 uvpifig = plt.figure(figsize=(15, 6))
 plt.suptitle('Spectral Selectivity by Cell Type (N>=3)',fontsize='xx-large', fontweight='bold')
@@ -1080,9 +813,7 @@ for n in range(0,len(sorted_types)):
     label_uvpi_center = uvpi_center[scraped_log[:,14] == current_label]
     # remove NaNs
     label_uvpi_center = label_uvpi_center[~np.isnan(label_uvpi_center)]
-    # plt.boxplot(label_uvpi_center, positions=[n], widths=0.8, showfliers=False, showcaps=False, whis=[0,100], labels={''})
     plt.scatter(n*np.ones(len(label_uvpi_center)), label_uvpi_center, color=[0,0,0], s=8, alpha=0.3)
-    # plt.violinplot(label_uvpi_center, positions=[n], showextrema=False, points=200)
     plt.text(n-0.2, -1.35, sorted_types[n], rotation='vertical')
     plt.text(n-0.3, 1.15, str(len(label_uvpi_center)))
 
@@ -1096,319 +827,15 @@ fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label sum
 uvpifig.savefig(fname, format='pdf', orientation='landscape')
 
 
-#%% By cell type / advanced temporal summary for RF surrounds
-
-# this value determines the threshold for N that will be required to include a cell type in summary plots (non-inclusive lower bound)
-thresh_n = 2
-
-utype_indices = np.unique(scraped_log[:,14]) != ''
-unique_types = np.unique(scraped_log[:,14])[utype_indices]
-classmarkers = np.zeros(len(unique_types))
-signmarkers = np.zeros(len(unique_types))
-Nbytype = np.zeros(len(unique_types))
-
-mean_label_spectrum = np.zeros((psdt.shape[0],2,len(unique_types)))
-
-tempfig = plt.figure(figsize=(15, 15))
-plt.suptitle('Temporal Summary for RF Surrouds, by Cell Type (N>=3)',fontsize='xx-large', fontweight='bold')
-# build axes
-plt.subplot(3,3,1,aspect=0.6)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.plot([-20,20],[20,-20],'k--',linewidth=0.5)
-plt.xlim(-20,20)
-plt.ylim(-30,30)
-plt.ylabel('Last Lobe AUC')
-plt.xlabel('Before Last Lobe AUC')
-plt.text(-15,25,'ON', fontsize='large', fontweight='demibold')
-plt.text(-8,-9,'Differentiators', fontsize='large', fontweight='demibold', rotation=-30)
-plt.text(10,-27,'OFF', fontsize='large', fontweight='demibold')
-plt.text(-7,-24,'Integrators', fontsize='large', fontweight='demibold')
-plt.text(-7,22,'Integrators', fontsize='large', fontweight='demibold')
-plt.text(-17,1,'Delayed', fontsize='large', fontweight='demibold')
-plt.text(-19,-3,'Integrators', fontsize='large', fontweight='demibold')
-plt.text(8,1,'Delayed', fontsize='large', fontweight='demibold')
-plt.text(6,-3,'Integrators', fontsize='large', fontweight='demibold')
-
-plt.subplot(3,3,2,aspect=0.8)
-plt.plot([-0.6,0.6],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-0.6,0.6],'k--',linewidth=0.5)
-plt.plot([-0.6,0.6],[0.6,-0.6],'k--',linewidth=0.5)
-plt.xlim(-0.6,0.6)
-plt.ylim(-0.6,0.6)
-plt.title('Blue')
-plt.ylabel('Last Lobe AUC')
-plt.xlabel('Before Last Lobe AUC')
-plt.subplot(3,3,3,aspect=0.8)
-plt.plot([-0.6,0.6],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-0.6,0.6],'k--',linewidth=0.5)
-plt.plot([-0.6,0.6],[0.6,-0.6],'k--',linewidth=0.5)
-plt.xlim(-0.6,0.6)
-plt.ylim(-0.6,0.6)
-plt.title('UV')
-plt.ylabel('Last Lobe AUC')
-plt.xlabel('Before Last Lobe AUC')
-
-plt.subplot(3,3,4)
-plt.xlim(-0.5,3)
-plt.ylim(-1.2,1.2)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.ylabel('UV Preference Index')
-plt.xlabel('Preferred TF')
-
-
-
-
-for ind in range(0,len(unique_types)):
-    # pull summary measurements for current cell type
-    current_label = unique_types[ind]
-    current_cells = scraped_log[scraped_log[:,14] == current_label,1]
-    current_n = len(current_cells)
-    Nbytype[ind] = current_n
-
-    if current_n > thresh_n:
-        # temporal spectrum
-        label_spectra = psdt_surr[:,:,scraped_log[:,14] == current_label]
-        mean_label_spectrum[:,:,ind] = np.nanmean(label_spectra,axis=2)
-        # preferred freq
-        label_prefTFs = pref_tfs[scraped_log[:,14] == current_label]
-        # TFmeans[ind,2] = np.nanmean(label_prefTFs)
-        # AUCs
-        label_BLLauc = surr_before_zc_auc[:,scraped_log[:,14] == current_label]
-        label_LLauc = surr_after_zc_auc[:,scraped_log[:,14] == current_label]
-        blue_sem = np.mean([np.std(label_BLLauc[0,:])/np.sqrt(current_n),np.std(label_LLauc[0,:])/np.sqrt(current_n)])
-        uv_sem = np.mean([np.std(label_BLLauc[1,:])/np.sqrt(current_n),np.std(label_LLauc[1,:])/np.sqrt(current_n)])
-
-        # define plot color based on cell class, and tag marker vector
-        if np.logical_or(np.logical_or(current_label[0]=='P',current_label[0]=='D'),current_label[0]=='S'):
-            plot_color=[0.8,0.2,0.8]
-            classmarkers[ind] = 3
-            # plt.subplot(339)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        elif np.logical_or(current_label[0]=='C',current_label[0]=='Y'):
-            plot_color=[0.2,0.8,0.2]
-            classmarkers[ind] = 2
-            # plt.subplot(338)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        else:
-            plot_color=[0,0,0]
-            classmarkers[ind] = 1
-            # plt.subplot(337)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        # manual correction for LMa's and Olt
-        if np.logical_or(current_label[0:1]=='LM',current_label[0:1]=='Ol'):
-            plot_color=[0.8,0.2,0.8]
-            classmarkers[ind] = 3
-            # plt.subplot(339)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-
-        # plot spectra based on sign of last lobe AUC
-        if np.sign(np.nanmedian(label_LLauc)) == 1:
-            signmarkers[ind] = 1
-            # Spectral selectivity index - AUC diff blue-UV
-            # plt.subplot(3,3,4)
-            # plt.scatter(np.nanmean(label_prefTFs),(np.nanmean(label_LLauc[1,:])-np.nanmean(label_LLauc[0,:]))/(np.nanmean(label_LLauc[1,:])+np.nanmean(label_LLauc[0,:])), color=[0.8,0.1,0.1], s=2+400*current_n/61, alpha=0.9-uv_sem/3)
-            # plt.subplot(337)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-        else:
-            signmarkers[ind] = -1
-            # Spectral selectivity index - AUC diff blue-UV
-            # plt.subplot(3,3,4)
-            # plt.scatter(np.nanmean(label_prefTFs),(np.nanmean(label_LLauc[1,:])-np.nanmean(label_LLauc[0,:]))/(np.nanmean(label_LLauc[1,:])+np.nanmean(label_LLauc[0,:])), color=[0.1,0.1,0.8], s=2+400*current_n/61, alpha=0.9-uv_sem/3)
-            # plt.subplot(338)
-            # plt.loglog(tfreq,np.nanmean(label_spectra,axis=(1,2)),color=plot_color,linewidth=0.5)
-
-        # basic AUC scatter
-        plt.subplot(3,3,2,aspect=0.8)
-        plt.scatter(np.nanmedian(label_BLLauc[0,:]),np.nanmedian(label_LLauc[0,:]), color=[0.2,0.2,0.2], s=20)
-        plt.subplot(3,3,3,aspect=0.8)
-        plt.scatter(np.nanmedian(label_BLLauc[1,:]),np.nanmedian(label_LLauc[1,:]), color=[0.2,0.2,0.2], s=20)
-        # size/class/variance modulated AUC scatter
-        # plt.subplot(3,3,2,aspect=0.8)
-        # plt.scatter(np.nanmean(label_BLLauc[0,:]),np.nanmean(label_LLauc[0,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-blue_sem/4)
-        # plt.subplot(3,3,3,aspect=0.8)
-        # plt.scatter(np.nanmean(label_BLLauc[1,:]),np.nanmean(label_LLauc[1,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-uv_sem/4)
-
-
-        # # Integration index - LL+BLL
-        # plt.subplot(3,3,5)
-        # plt.scatter(np.nanmean(label_prefTFs),np.nanmean(label_LLauc[0,:])+np.nanmean(label_BLLauc[0,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-2.5*blue_sem)
-        # plt.subplot(3,3,6)
-        # plt.scatter(np.nanmean(label_prefTFs),np.nanmean(label_LLauc[1,:])+np.nanmean(label_BLLauc[1,:]), color=plot_color, s=2+400*current_n/61, alpha=0.9-2.5*blue_sem)
-
-plt.subplot(3,3,5)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.ylabel('Log(Norm. Power)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,0,np.logical_and(signmarkers == 1, Nbytype > thresh_n)],axis=(1)),color=[0.8,0.1,0.1],linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,0,np.logical_and(signmarkers == -1, Nbytype > thresh_n)],axis=(1)),color=[0.1,0.1,0.8],linewidth=2)
-
-plt.subplot(3,3,6)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,1,np.logical_and(signmarkers == 1, Nbytype > thresh_n)],axis=1),color=[0.8,0.1,0.1],linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,1,np.logical_and(signmarkers == -1, Nbytype > thresh_n)],axis=1),color=[0.1,0.1,0.8],linewidth=2)
-
-plt.subplot(3,3,7)
-plt.ylim(0.01,0.15)
-plt.ylabel('Log(Norm. Power)')
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 1, Nbytype > thresh_n)],axis=(1,2)), color=[0,0,0], linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 1, Nbytype > thresh_n)],axis=(1)), color=[0,0,0], linewidth=0.5, alpha=0.3)
-
-plt.subplot(3,3,8)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 2, Nbytype > thresh_n)],axis=(1,2)), color=[0.2,0.8,0.2], linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 2, Nbytype > thresh_n)],axis=(1)), color=[0.2,0.8,0.2], linewidth=0.5, alpha=0.5)
-
-plt.subplot(3,3,9)
-plt.ylim(0.01,0.15)
-plt.xlabel('Log(Temporal Freq.)')
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 3, Nbytype > thresh_n)],axis=(1,2)), color=[0.8,0.2,0.8], linewidth=2)
-plt.loglog(tfreq,np.nanmean(mean_label_spectrum[:,:,np.logical_and(classmarkers == 3, Nbytype > thresh_n)],axis=(1)), color=[0.8,0.2,0.8], linewidth=0.5, alpha=0.4)
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/SURROUNDS_auc_spectrum_byType.pdf'
-tempfig.savefig(fname, format='pdf', orientation='portrait')
-#%% Center vs. Surround temporal comparison
-
-thresh_n = 1
-
-utype_indices = np.unique(scraped_log[:,14]) != ''
-unique_types = np.unique(scraped_log[:,14])[utype_indices]
-
-
-mean_label_spectrum = np.zeros((psdt.shape[0],2,len(unique_types)))
-mean_surround_spectrum = np.zeros((psdt_surr.shape[0],2,len(unique_types)))
-mean_LL = np.zeros((2,len(unique_types)))
-mean_surr_LL = np.zeros((2,len(unique_types)))
-
-tempfig = plt.figure(figsize=(15, 15))
-plt.suptitle('Center vs. Surround by Cell Type (N>=3)',fontsize='xx-large', fontweight='bold')
-for ind in range(0,len(unique_types)):
-    # pull summary measurements for current cell type
-    current_label = unique_types[ind]
-    current_cells = scraped_log[scraped_log[:,14] == current_label,1]
-    current_n = len(current_cells)
-    Nbytype[ind] = current_n
-
-    if current_n > thresh_n:
-        # temporal spectra
-        label_spectra = psdt[:,:,scraped_log[:,14] == current_label]
-        label_surr_spectra = psdt_surr[:,:,scraped_log[:,14] == current_label]
-        mean_label_spectrum[:,:,ind] = np.nanmean(label_spectra,axis=2)
-        mean_surround_spectrum[:,:,ind] = np.nanmean(label_surr_spectra,axis=2)
-        # AUCs
-        label_BLLauc = before_zc_auc[:,scraped_log[:,14] == current_label]
-        label_LLauc = after_zc_auc[:,scraped_log[:,14] == current_label]
-        mean_LL[:,ind] = np.nanmean(label_LLauc,axis=1)
-        label_surr_BLLauc = surr_before_zc_auc[:,scraped_log[:,14] == current_label]
-        label_surr_LLauc = surr_after_zc_auc[:,scraped_log[:,14] == current_label]
-        mean_surr_LL[:,ind] = np.nanmean(label_surr_LLauc,axis=1)
-
-        # define plot color based on cell class, and tag marker vector
-        if np.logical_or(np.logical_or(current_label[0]=='P',current_label[0]=='D'),current_label[0]=='S'):
-            plot_color=[0.8,0.2,0.8]
-            classmarkers[ind] = 3
-        elif np.logical_or(current_label[0]=='C',current_label[0]=='Y'):
-            plot_color=[0.2,0.8,0.2]
-            classmarkers[ind] = 2
-        else:
-            plot_color=[0,0,0]
-            classmarkers[ind] = 1
-        # manual correction for LMa's and Olt
-        if np.logical_or(current_label[0:1]=='LM',current_label[0:1]=='Ol'):
-            plot_color=[0.8,0.2,0.8]
-            classmarkers[ind] = 3
-
-        # plot last lobe AUCs for center vs. surround
-        plt.subplot(3,3,1)
-        plt.scatter(np.nanmean(label_surr_LLauc[0,:]),np.nanmean(label_LLauc[0,:]), color=plot_color)
-        plt.subplot(3,3,2)
-        plt.scatter(np.nanmean(label_surr_LLauc[1,:]),np.nanmean(label_LLauc[1,:]), color=plot_color)
-        plt.subplot(3,3,7)
-        plt.scatter(np.nanmean(label_surr_BLLauc[0,:]),np.nanmean(label_BLLauc[0,:]), color=plot_color)
-        plt.subplot(3,3,8)
-        plt.scatter(np.nanmean(label_surr_BLLauc[1,:]),np.nanmean(label_BLLauc[1,:]), color=plot_color)
-
-# correlation tables
-auc_corr_table = np.corrcoef(np.append(mean_LL,mean_surr_LL,axis=0))
-bxcorr = np.corrcoef(np.append(mean_label_spectrum[:,0,Nbytype>thresh_n], mean_surround_spectrum[:,0,Nbytype>thresh_n],axis=0))[0:30,30:]
-uvxcorr = np.corrcoef(np.append(mean_label_spectrum[:,1,Nbytype>thresh_n], mean_surround_spectrum[:,1,Nbytype>thresh_n],axis=0))[0:30,30:]
-
-# build axes
-plt.subplot(3,3,1)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.xlim(-1,1)
-plt.ylim(-12,12)
-plt.text(0.5,9,'R = '+str(np.round(auc_corr_table[0,2],2)))
-plt.ylabel('Center Last Lobe AUC')
-plt.xlabel('Surround Last Lobe AUC')
-plt.title('Blue')
-plt.subplot(3,3,2)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.xlim(-1,1)
-plt.ylim(-12,12)
-plt.text(0.5,9,'R = '+str(np.round(auc_corr_table[1,3],2)))
-plt.ylabel('Center Last Lobe AUC')
-plt.xlabel('Surround Last Lobe AUC')
-plt.title('UV')
-
-plt.subplot(3,3,4)
-x = plt.imshow(bxcorr, clim=[-0.8,0.8])
-x.axes.get_yaxis().set_ticks(np.arange(0,30,1))
-x.axes.get_yaxis().set_ticklabels(np.round(tfreq,2).astype('str'))
-x.axes.get_xaxis().set_ticks(np.arange(0,30,1))
-x.axes.get_xaxis().set_ticklabels(np.round(tfreq,2).astype('str'), rotation='vertical')
-plt.ylabel('Surround Norm. Power')
-plt.xlabel('Center Norm. Power')
-
-plt.subplot(3,3,5)
-x = plt.imshow(uvxcorr, clim=[-0.8,0.8])
-x.axes.get_yaxis().set_ticks([])
-x.axes.get_xaxis().set_ticks(np.arange(0,30,1))
-x.axes.get_xaxis().set_ticklabels(np.round(tfreq,2).astype('str'), rotation='vertical')
-plt.xlabel('Center Norm. Power')
-
-plt.subplot(3,3,6)
-plt.axis('off')
-plt.colorbar(location='left', shrink=0.8, aspect=10)
-
-plt.subplot(3,3,7)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.xlim(-1,1)
-plt.ylim(-8,8)
-plt.ylabel('Center Before Last Lobe AUC')
-plt.xlabel('Surround Before Last Lobe AUC')
-plt.subplot(3,3,8)
-plt.plot([-20,20],[0,0],'k--',linewidth=0.5)
-plt.plot([0,0],[-30,30],'k--',linewidth=0.5)
-plt.xlim(-1,1)
-plt.ylim(-8,8)
-plt.ylabel('Center Before Last Lobe AUC')
-plt.xlabel('Surround Before Last Lobe AUC')
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/center_vs_surround_temporal_dynamics.pdf'
-tempfig.savefig(fname, format='pdf', orientation='portrait')
-
-
 # %% Flicker summary plots - all cells
 
 culled_flick_mds = flick_mod_depths[:,~np.isnan(flick_mod_depths[0,:])]
 culled_flick_DCs = flick_DCs[:,~np.isnan(flick_DCs[0,:])]
 # sort by response vector length
-# sorted_flick_mds = culled_flick_mds[:,np.argsort(np.dot(np.transpose(culled_flick_mds),[1,2,3,4]))]
 sorted_flick_mds = culled_flick_mds[:,np.argsort(culled_flick_mds[0,:])]
 sorted_flick_DCs = culled_flick_DCs[:,np.argsort(culled_flick_mds[0,:])]
 
-# sort by response vector angle
-# flick_md_sort_weights = np.average(np.transpose(np.tile([1,2,3,4],(culled_flick_mds.shape[1],1))), axis=0, weights=culled_flick_mds)
-# sorted_flick_mds = culled_flick_mds[:,np.argsort(flick_md_sort_weights)]
+
 
 flkfig=plt.figure(figsize=(15, 8))
 plt.subplot(1,2,1)
@@ -1431,129 +858,6 @@ plt.colorbar(fraction=0.1, aspect=4, ticks=[-1,0,1], label='x100 ''%'' dF/F', sh
 # save it
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/flicker_summary.pdf'
 flkfig.savefig(fname, format='pdf', orientation='landscape')
-#%% flicker vs. temporal figure
-
-thresh_n = 2
-
-flkfig=plt.figure(figsize=(15, 12))
-
-ps_val_means = np.zeros((4,len(unique_types)))
-md_means = np.zeros((4,len(unique_types)))
-dc_means = np.zeros((4,len(unique_types)))
-
-for ind in range(0,len(unique_types)):
-    # pull summary measurements for current cell type
-    current_label = unique_types[ind]
-    current_cells = scraped_log[scraped_log[:,14] == current_label,1]
-    current_n = len(current_cells)
-
-    if current_n > thresh_n:
-        # temporal spectrum
-        label_spectra = psdt[:,:,scraped_log[:,14] == current_label]
-        # flicker modulation depth and DC signal
-        label_mds = flick_mod_depths[:,scraped_log[:,14] == current_label]
-        label_dcs = flick_DCs[:,scraped_log[:,14] == current_label]
-
-        # grab spectrum points corresponding to flick stimuli
-        ps_vals = np.zeros(4)
-        ps_vals[0] = np.nanmean(label_spectra[0:2,:,:],axis=(0,1,2))
-        ps_vals[1] = np.nanmean(label_spectra[1:3,:,:],axis=(0,1,2))
-        ps_vals[2] = np.nanmean(label_spectra[3,:,:],axis=(0,1))
-        ps_vals[3] = np.nanmean(label_spectra[6,:,:],axis=(0,1))
-
-        # save means to vecs for corr calcs
-        ps_val_means[:,ind] = ps_vals
-        md_means[:,ind] = np.nanmean(label_mds,axis=1)
-        dc_means[:,ind] = np.nanmean(label_dcs,axis=1)
-
-        # calculate SEMs for alpha
-        md_sem = np.nanstd(label_mds,axis=1)/np.sqrt(current_n)
-        dc_sem = np.nanstd(label_dcs,axis=1)/np.sqrt(current_n)
-
-        # define plot color by cell class
-        # if classmarkers[ind] == 1:
-        #     plot_color=[0,0,0]
-        # elif classmarkers[ind] == 2:
-        #     plot_color=[0.2,0.8,0.2]
-        # elif classmarkers[ind] == 3:
-        #     plot_color=[0.8,0.2,0.8]
-
-        # define plot color by cell sign
-        if signmarkers[ind] == 1:
-            plot_color=[0.8,0.1,0.1]
-        elif signmarkers[ind] == -1:
-            plot_color=[0.1,0.1,0.8]
-
-        # plot
-        for n in range(0,4):
-            plt.subplot(3,4,(n+1)), plt.scatter(np.nanmean(label_mds,axis=1)[n], ps_vals[n], color=plot_color, s=2+400*current_n/61, alpha=0.8-md_sem[n])
-            plt.subplot(3,4,4+(n+1)), plt.scatter(np.nanmean(label_dcs,axis=1)[n], ps_vals[n], color=plot_color, s=2+400*current_n/61, alpha=0.8-dc_sem[n])
-            plt.subplot(3,4,8+(n+1)), plt.scatter(np.nanmean(label_dcs,axis=1)[n], np.nanmean(label_mds,axis=1)[n], color=plot_color, s=2+400*current_n/61, alpha=0.8-md_sem[n])
-corrmat = np.corrcoef(np.append(ps_val_means[:,Nbytype>thresh_n], np.append(md_means[:,Nbytype>thresh_n],dc_means[:,Nbytype>thresh_n],axis=0),axis=0))
-
-plt.subplot(341)
-plt.ylim(0,0.12)
-plt.xlim(0,2)
-plt.text(1.2,0.01,'R = ' + str(np.round(corrmat[0,4],3)))
-plt.title('0.1 Hz')
-plt.xlabel('Flicker Modulation Depth')
-plt.ylabel('Freq-matched Power')
-plt.subplot(342)
-plt.ylim(0,0.12)
-plt.xlim(0,2)
-plt.text(1.2,0.01,'R = ' + str(np.round(corrmat[1,5],3)))
-plt.title('0.5 Hz')
-plt.subplot(343)
-plt.ylim(0,0.12)
-plt.xlim(0,2)
-plt.text(1.2,0.01,'R = ' + str(np.round(corrmat[2,6],3)))
-plt.title('1 Hz')
-plt.subplot(344)
-plt.ylim(0,0.12)
-plt.xlim(0,2)
-plt.text(1.2,0.01,'R = ' + str(np.round(corrmat[3,7],3)))
-plt.title('2 Hz')
-
-plt.subplot(345)
-plt.ylim(0,0.12)
-plt.xlim(-0.6,0.6)
-plt.xlabel('Flicker DC Offset')
-plt.ylabel('Freq-matched Power')
-plt.subplot(346)
-plt.ylim(0,0.12)
-plt.xlim(-0.6,0.6)
-plt.subplot(347)
-plt.ylim(0,0.12)
-plt.xlim(-0.6,0.6)
-plt.subplot(348)
-plt.ylim(0,0.12)
-plt.xlim(-0.6,0.6)
-
-plt.subplot(349)
-plt.ylim(0,2)
-plt.xlim(-0.6,0.6)
-plt.text(0.1,1.75,'R = ' + str(np.round(corrmat[4,8],3)))
-plt.xlabel('Flicker DC Offset')
-plt.ylabel('Flicker Modulation Depth')
-plt.subplot(3,4,10)
-plt.ylim(0,2)
-plt.xlim(-0.6,0.6)
-plt.text(0.1,1.75,'R = ' + str(np.round(corrmat[5,9],3)))
-plt.subplot(3,4,11)
-plt.ylim(0,2)
-plt.xlim(-0.6,0.6)
-plt.text(0.1,1.75,'R = ' + str(np.round(corrmat[6,10],3)))
-plt.subplot(3,4,12)
-plt.ylim(0,2)
-plt.xlim(-0.6,0.6)
-plt.text(0.1,1.75,'R = ' + str(np.round(corrmat[7,11],3)))
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/flicker_correlations_byType.pdf'
-flkfig.savefig(fname, format='pdf', orientation='landscape')
-
-
-
 
 
 #%% spatial summary figure
@@ -1595,7 +899,6 @@ norm_ns_ps = (1/freq[1:])/np.sum(1/freq[1:])
 mean_spatial_ps = np.nanmean(psd1D,axis=(1,2))
 
 mean_label_spectrum = np.zeros((psd1D.shape[0],len(unique_types)))
-# for ind in range(0,1):
 for ind in range(0,len(unique_types)):
     current_label = unique_types[ind]
     label_spectra = psd1D[:,:,scraped_log[:,14] == current_label]
@@ -1615,9 +918,6 @@ plt.xlabel('Preferred Spatial Freq (cycles per deg)')
 
 # initialize sorting array for mean displacements and collective culled vector
 label_mean_os = np.zeros(len(unique_types))
-
-# replace nans in orientation selectivity vector with 1s (i.e., no selectivity)
-# orient_selects = np.where(np.isnan(orient_selects),1,orient_selects)
 
 # initializae variance by cell type array
 po_var = np.zeros(len(unique_types))
@@ -1667,15 +967,9 @@ for n in range(0,len(sorted_types)):
                 plotcolor = [0.8,0.8,0.4]
             elif label == 'TmY16':
                 plotcolor = [0.8,0.4,0.8]
-            # elif label == 'L2':
-            #     plotcolor = [0.8,0.6,0.2]
             else:
                 plotcolor = [0.4,0.4,0.4]
             plt.subplot(3,1,3)
-            # if len(label_os) >= 6:
-            #     plt.boxplot(label_os, positions=[counter], widths=0.8, showfliers=False, showcaps=False, whis=[0,100], labels={''})
-            # else:
-            #     plt.plot([counter, counter], [np.max(label_os), np.min(label_os)], color='k', linewidth=0.75)
             plt.scatter(np.full(len(label_os),counter),label_os,color=[0,0,0],s=8,alpha=0.3)
             plt.scatter(counter,np.nanmedian(label_os),color=[0,0,0],s=30)
             plt.text(counter-0.2, -0.4, sorted_types[n], rotation='vertical')
@@ -1683,168 +977,18 @@ for n in range(0,len(sorted_types)):
             plt.subplot(3,3,6)
             plt.scatter(np.nanmedian(label_os),sorted_po_var[n],color=plotcolor,s=20)
 
-# plt.scatter(center_areas,orient_selects,s=2)
 plt.subplot(3,1,3)
 plt.ylim(0.4,3.5)
-# plt.xlim(0.5,4.5)
 plt.ylabel('Orientation Selectivity Ratio')
 plt.subplot(3,3,6)
 plt.xlim(1.1,2.3)
 plt.xlabel('Orientation Selectivity Ratio')
 plt.ylabel('Variance of Preferred Orientations')
 
-# remove nans by overwriting with the median nonzero variance (this preserves 0 as a "special" result for this metric), then save circular variance by cell type
-# po_var[np.isnan(po_var)] = np.nanmedian(po_var[np.nonzero(po_var)])
-# np.save('/Volumes/TBD/Bruker/STRFs/compiled/pref_orientation_variance_byType.npy', po_var)
-
 # save figure
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/spatial_summary.pdf'
 spacefig.savefig(fname, format='pdf', orientation='portrait')
 
-
-
-#%% by cell type / advanced spatial summary
-thresh_n = 2
-
-utype_indices = np.unique(scraped_log[:,14]) != ''
-unique_types = np.unique(scraped_log[:,14])[utype_indices]
-
-mean_label_spectra = np.zeros((psd1D.shape[0],2,len(unique_types)))
-label_os_mean = np.zeros(len(unique_types))
-label_ser_mean = np.zeros(len(unique_types))
-label_os_sem = np.zeros(len(unique_types))
-label_ser_sem = np.zeros(len(unique_types))
-areas_bytype = np.zeros(len(unique_types))
-
-spacefig=plt.figure(figsize=(15, 12))
-plt.suptitle('Spatial Summary by Type (N>=3)',fontsize='xx-large', fontweight='bold')
-
-for ind in range(0,len(unique_types)):
-    # pull summary measurements for current cell type
-    current_label = unique_types[ind]
-    current_cells = scraped_log[scraped_log[:,14] == current_label,1]
-    current_n = len(current_cells)
-
-    if current_n > thresh_n:
-        # spatial spectrum
-        label_spectra = psd1D[:,:,scraped_log[:,14] == current_label]
-        mean_label_spectra[:,:,ind] = np.nanmean(label_spectra,axis=2) # second dim is color
-        # preferred spatial frequency
-        label_prefSFs = pref_sfs[scraped_log[:,14] == current_label]
-        # OS - preference index
-        label_os = orient_selects[scraped_log[:,14] == current_label]
-        label_os_mean[ind] = np.nanmean(label_os)
-        label_os_sem[ind] = np.nanstd(label_os)/np.sqrt(Nbytype[ind])
-        # OS - spatial extent ratio long::short
-        label_ser = long_axes[scraped_log[:,14] == current_label]/short_axes[scraped_log[:,14] == current_label]
-        label_ser_mean[ind] = np.nanmean(label_ser)
-        label_ser_sem[ind] = np.nanstd(label_ser)/np.sqrt(Nbytype[ind])
-        # RF area
-        label_area = center_areas[scraped_log[:,14] == current_label]
-        label_area_mean = np.nanmean(label_area)
-        ellipse_area = ellipse_areas[scraped_log[:,14] == current_label]
-        ellipse_area_mean = np.nanmean(ellipse_area)
-        areas_bytype[ind] = ellipse_area_mean
-
-        # define plot color by cell class
-        if classmarkers[ind] == 1:
-            plot_color=[0,0,0]
-            plt.subplot(3,3,1)
-            plt.scatter(np.nanmean(label_prefSFs), label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-            plt.subplot(3,3,4)
-            plt.scatter(ellipse_area_mean, label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-        elif classmarkers[ind] == 2:
-            plot_color=[0.2,0.8,0.2]
-            plt.subplot(3,3,1)
-            plt.scatter(np.nanmean(label_prefSFs), label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-            plt.subplot(3,3,4)
-            plt.scatter(ellipse_area_mean, label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-        elif classmarkers[ind] == 3:
-            plot_color=[0.8,0.2,0.8]
-            plt.subplot(3,3,1)
-            plt.scatter(np.nanmean(label_prefSFs), label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-            plt.subplot(3,3,4)
-            plt.scatter(ellipse_area_mean, label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-
-        # define plot color by cell sign
-        if signmarkers[ind] == 1:
-            plot_color=[0.8,0.1,0.1]
-            plt.subplot(3,3,2)
-            plt.scatter(np.nanmean(label_prefSFs), label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-        elif signmarkers[ind] == -1:
-            plot_color=[0.1,0.1,0.8]
-            plt.subplot(3,3,2)
-            plt.scatter(np.nanmean(label_prefSFs), label_os_mean[ind], color=plot_color, s=2+400*current_n/61, alpha=0.8-label_os_sem[ind])
-
-# axis organization
-plt.subplot(3,3,1)
-plt.ylim([1,2.25])
-plt.ylabel('OS index (L/S)')
-plt.xlabel('Pref SF (cycles/deg)')
-plt.subplot(3,3,2)
-# plt.ylim([1,2.5])
-plt.ylim([1,2.25])
-plt.xlabel('Pref SF (cycles/deg)')
-
-plt.subplot(3,3,4)
-plt.ylim([1,2.25])
-plt.xlim([50,450])
-plt.ylabel('OS index (L/S)')
-plt.xlabel('Ellipse model area')
-
-# spectrum by ON/OFF superclass w/ Nbytype>thresh_n across colors
-plt.subplot(3,3,5)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,0,np.logical_and(signmarkers==1, Nbytype>thresh_n)],axis=(1)), color=[0.8,0.1,0.1], linewidth=2)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,0,np.logical_and(signmarkers==-1, Nbytype>thresh_n)],axis=(1)), color=[0.1,0.1,0.8], linewidth=2)
-plt.ylim([0.003,0.22])
-plt.ylabel('Log(Norm. Power)')
-plt.xlabel('Log(Spatial Freq.)')
-plt.text(0.02,0.01,'Blue')
-plt.subplot(3,3,6)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,1,np.logical_and(signmarkers==1, Nbytype>thresh_n)],axis=(1)), color=[0.8,0.1,0.1], linewidth=2)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,1,np.logical_and(signmarkers==-1, Nbytype>thresh_n)],axis=(1)), color=[0.1,0.1,0.8], linewidth=2)
-plt.ylim([0.003,0.22])
-plt.xlabel('Log(Spatial Freq.)')
-plt.text(0.02,0.01,'UV')
-
-# spectrum by FF/FB/Lat superclass w/ Nbytype>thresh_n across colors
-plt.subplot(3,3,7)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,:,np.logical_and(classmarkers==1,Nbytype>thresh_n)],axis=(1,2)), color=[0,0,0], linewidth=2)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,:,np.logical_and(classmarkers==1,Nbytype>thresh_n)],axis=(1)), color=[0,0,0], linewidth=0.5, alpha=0.3)
-plt.ylim([0.003,0.22])
-plt.ylabel('Log(Norm. Power)')
-plt.xlabel('Log(Spatial Freq.)')
-
-plt.subplot(3,3,8)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,:,np.logical_and(classmarkers==2,Nbytype>thresh_n)],axis=(1,2)), color=[0.2,0.8,0.2], linewidth=2)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,:,np.logical_and(classmarkers==2,Nbytype>thresh_n)],axis=(1)), color=[0.2,0.8,0.2], linewidth=0.5, alpha=0.5)
-plt.ylim([0.003,0.22])
-plt.xlabel('Log(Spatial Freq.)')
-
-plt.subplot(3,3,9)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,:,np.logical_and(classmarkers==3,Nbytype>thresh_n)],axis=(1,2)), color=[0.8,0.2,0.8], linewidth=2)
-plt.loglog(sf_vec[:15], np.nanmean(mean_label_spectra[:15,:,np.logical_and(classmarkers==3,Nbytype>thresh_n)],axis=(1)), color=[0.8,0.2,0.8], linewidth=0.5, alpha=0.4)
-plt.ylim([0.003,0.22])
-plt.xlabel('Log(Spatial Freq.)')
-
-# superclass histogram calculations
-ff_hist = np.histogram(areas_bytype[np.logical_and(classmarkers==1,Nbytype>thresh_n)], bins=10, range=(50,450))
-ff_norm = ff_hist[0]
-fb_hist = np.histogram(areas_bytype[np.logical_and(classmarkers==2,Nbytype>thresh_n)], bins=10, range=(50,450))
-fb_norm = fb_hist[0]
-lat_hist = np.histogram(areas_bytype[np.logical_and(classmarkers==3,Nbytype>thresh_n)], bins=10, range=(50,450))
-lat_norm = lat_hist[0]
-plt.subplot(3,3,3)
-plt.plot(ff_hist[1][1:], ff_norm, color=[0,0,0]);
-plt.plot(ff_hist[1][1:], fb_norm, color=[0.2,0.8,0.2]);
-plt.plot(ff_hist[1][1:], lat_norm, color=[0.8,0.2,0.8]);
-plt.ylabel('# Cell Types')
-plt.xlabel('RF Center Area (sq. deg)')
-
-np.sum(ff_hist[0])+np.sum(fb_hist[0])+np.sum(lat_hist[0])
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/OS_spectra_bytype.pdf'
-spacefig.savefig(fname, format='pdf', orientation='landscape')
 
 #%% generate a temporally smoothed version of STRFs for improving DS simulation results - only needs to be run once, prior to running DS simulations (in a different script)
 
@@ -1884,7 +1028,7 @@ for cell_ind in range(0,scraped_log.shape[0]):
 # save the array so it can be moved to Oak for processing via Sherlock
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_smoothed_strfs.npy', all_smoothed_STRFs)
 
-#%% load and analyze simulated DS data
+#%% load and analyze simulated DS data - generated via DS_simulate_jointSTRF.py
 # helper functions
 def cart2pol(x, y):
     rho = np.sqrt(x**2 + y**2)
@@ -1929,7 +1073,6 @@ for cell_ind in range(0,scraped_log.shape[0]):
         nd = int(np.mod(pd-current_resp.shape[1]/2,current_resp.shape[1]))
         # basic pd-nd responses at peak_t phase
         peak_phase_diff[cell_ind] = current_resp[peak_t,pd] - current_resp[peak_t,nd]
-        # peak_phase_diff[cell_ind] = (current_resp[peak_t,pd] - np.max(current_resp[:,nd]))/(current_resp[peak_t,pd] + np.max(current_resp[:,nd]))
         # convert pd and nd waveforms into polar coordinates (18 deg or pi/10 radians per index for a 1 sec temporal period)(in general, 2*pi/(dt/tp) radians)
         rho_p = current_resp[peak_t,pd]
         phi_p = peak_t*(np.pi/10)/tp
@@ -2018,10 +1161,6 @@ for n in range(0, len(sorted_inds)):
     label_dsi = ds_index[scraped_log[:,14] == current_label]
     label_dsi[label_areas < area_thresh] = np.nan
     label_dsi = label_dsi[~np.isnan(label_dsi)]
-    # if len(label_dsi) >= 6:
-    #     plt.boxplot(label_dsi, positions=[n], widths=0.8, showfliers=False, showcaps=False, whis=[0,100], labels={''})
-    # else:
-    #     plt.plot([n, n], [np.max(label_dsi), np.min(label_dsi)], color='k', linewidth=0.75)
     plt.scatter(np.full(len(label_dsi),n),label_dsi,color=[0,0,0],s=8,alpha=0.3)
     plt.text(n, -0.2, current_label, rotation='vertical')
     plt.text(n, -0.4, str(len(label_dsi)))
@@ -2041,7 +1180,6 @@ for n in range(0, len(sorted_inds)):
     plt.text(n, -0.2, current_label, rotation='vertical')
     plt.text(n, -0.4, str(len(label_pkdiff)))
 plt.scatter(np.arange(0,len(thresh_types),1), label_pkdiff_mean[sorted_inds], color=[0,0,0], s=30)
-# plt.ylim([-0.25,0.9])
 plt.ylabel('DSI (amplitdue dif.)')
 
 plt.subplot(413)
@@ -2052,10 +1190,6 @@ for n in range(0, len(sorted_inds)):
     label_pvec_len = pop_vec_rel_len[scraped_log[:,14] == current_label]
     label_pvec_len[label_areas < area_thresh] = np.nan
     label_pvec_len = label_pvec_len[~np.isnan(label_pvec_len)]
-    # if len(label_pvec_len) >= 6:
-    #     plt.boxplot(label_pvec_len, positions=[n], widths=0.8, showfliers=False, showcaps=False, whis=[0,100], labels={''})
-    # else:
-    #     plt.plot([n, n], [np.max(label_pvec_len), np.min(label_pvec_len)], color='k', linewidth=0.75)
     plt.scatter(np.full(len(label_pvec_len),n),label_pvec_len,color=[0,0,0],s=8,alpha=0.3)
     plt.text(n, -0.2, current_label, rotation='vertical')
     plt.text(n, -0.4, str(len(label_pvec_len)))
@@ -2094,124 +1228,6 @@ plt.ylabel('Population vector rel. length')
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/DS_summary.pdf'
 dsfig.savefig(fname, format='pdf', orientation='portrait')
 
-#%% plot DS example
-
-dsexfig = plt.figure(figsize=(15, 12))
-plt.suptitle(scraped_log[cell_ind,1])
-
-plt.subplot(221)
-for n in range(0,len(all_rho)):
-    v = pol2cart(all_rho[n],all_phi[n]+all_theta[n])
-    plt.plot([0,v[0]],[0,v[1]],'k-')
-    plt.plot([0,pop_end[0]],[0,pop_end[1]],'r-')
-    plt.axis('equal')
-    plt.axis('square')
-    plt.title('Response Population Vector')
-plt.text(-800000,800000,'Rel. L = ' + str(np.round(pop_vec_rel_len[cell_ind,c],2)))
-pop_vec_rel_len.shape
-plt.subplot(222)
-if tp == 1:
-    plt.plot(all_ds_sims[int(6/(dt/tp)):int(7/(dt/tp))+1,:,0,cell_ind])
-elif tp == 0.5:
-    plt.plot(all_ds_sims[int(9/(dt/tp)):int(10/(dt/tp))+1,:,0,cell_ind])
-elif tp == 2:
-    plt.plot(all_ds_sims[int(3/(dt/tp)):int(4/(dt/tp))+1,:,0,cell_ind])
-plt.title('Steady-state Single Cycle Response')
-
-plt.subplot(223)
-plt.plot([0,pol2cart(rho_p,phi_p)[0]],[0,pol2cart(rho_p,phi_p)[1]],'k-')
-plt.plot([0,pol2cart(rho_n,phi_n)[0]],[0,pol2cart(rho_n,phi_n)[1]],'r-')
-plt.plot([0,vdif[0]],[0,vdif[1]],'b-')
-plt.text(400000,0,'DSI = ' + str(np.round(ds_index[cell_ind,c],2)))
-plt.axis('equal')
-plt.axis('square')
-plt.title('PD, ND, and PD-ND Vectors')
-
-plt.subplot(224)
-# plt.plot(all_ds_sims[int(3/(dt/tp)):int(4/(dt/tp))+1,pd,0,cell_ind],'k-')
-if tp == 1:
-    plt.plot(all_ds_sims[int(6/(dt/tp)):int(7/(dt/tp))+1,pd,0,cell_ind],'k-')
-    plt.plot(all_ds_sims[int(6/(dt/tp)):int(7/(dt/tp))+1,nd,0,cell_ind],'r-')
-elif tp == 2:
-    plt.plot(all_ds_sims[int(3/(dt/tp)):int(4/(dt/tp))+1,pd,0,cell_ind],'k-')
-    plt.plot(all_ds_sims[int(3/(dt/tp)):int(4/(dt/tp))+1,nd,0,cell_ind],'r-')
-elif tp == 0.5:
-    plt.plot(all_ds_sims[int(9/(dt/tp)):int(10/(dt/tp))+1,pd,0,cell_ind],'k-')
-    plt.plot(all_ds_sims[int(9/(dt/tp)):int(10/(dt/tp))+1,nd,0,cell_ind],'r-')
-
-plt.title('PD and ND Single Cycle Responses')
-
-#%% save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/DS_example_Mi1.pdf'
-dsexfig.savefig(fname, format='pdf', orientation='landscape')
-
-#%% visual feature covariance matrix - modified from the full version in ME_build_correlate, which must be run first in order to generate the table that is loaded here! This version uses all cell types @ N>=3, rather than only those cell types that exist in the transcriptome dataset.
-
-# load saved data
-highN_table = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/data table/high_N_table.npy')
-cell_type_list = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/data table/high_N_cell_type_list.npy')
-feat_list = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/data table/feature_list.npy')
-feat_list
-# identify unique cell types
-utypes = np.unique(cell_type_list)
-
-# container table for mean data by cell type and nan-removed raw data
-mean_table = np.full((len(utypes),highN_table.shape[1]), np.nan, dtype='float')
-median_table = np.full((len(utypes),highN_table.shape[1]), np.nan, dtype='float')
-nl_highN_table = np.zeros((1,highN_table.shape[1]))
-
-# loop over unique types to populate mean table
-for type in range(0,len(utypes)):
-    current_label = utypes[type]
-    type_data = highN_table[cell_type_list == current_label,:]
-    mean_table[type,:] = np.nanmean(type_data, axis=0)
-    median_table[type,:] = np.nanmedian(type_data, axis=0)
-
-#%% plotting - full table
-fullfeatfig = plt.figure(figsize=(15,15))
-x = plt.imshow(-1*np.corrcoef(np.transpose(median_table)), cmap='PuOr', clim=(-1,1))
-x.axes.get_yaxis().set_ticks(np.arange(0,89,1))
-x.axes.get_yaxis().set_ticklabels(feat_list);
-x.axes.get_xaxis().set_ticks(np.arange(0,89,1))
-x.axes.get_xaxis().set_ticklabels(feat_list, rotation='vertical');
-plt.colorbar(shrink=0.2, aspect=10)
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/feature covariance matrix.pdf'
-fullfeatfig.savefig(fname, format='pdf', orientation='landscape')
-
-#%% plotting feature subsets
-partialfeatfig = plt.figure(figsize=(18,18))
-# spatial[47:63] vs temporal[5:35] spectra
-plt.subplot(221)
-tables_subset = np.append(np.append(np.append(median_table[:,5:35], median_table[:,47:63], axis=1), np.append(median_table[:,79:81], median_table[:,66:69], axis=1), axis=1), median_table[:,87:89], axis=1)
-feat_subset = np.append(np.append(np.append(feat_list[5:35], feat_list[47:63]), np.append(feat_list[79:81], feat_list[66:69])), feat_list[87:89])
-x = plt.imshow(-1*np.corrcoef(np.transpose(tables_subset)), cmap='PuOr', clim=(-1,1))
-plt.plot([29.5,29.5], [-0.5,len(feat_subset)-0.5], '-', color=[0.2,0.7,0.3])
-plt.plot([-0.5,len(feat_subset)-0.5], [29.5,29.5], '-', color=[0.2,0.7,0.3])
-plt.plot([45.5,45.5], [-0.5,len(feat_subset)-0.5], '-', color=[0.2,0.7,0.3])
-plt.plot([-0.5,len(feat_subset)-0.5], [45.5,45.5], '-', color=[0.2,0.7,0.3])
-x.axes.get_yaxis().set_ticks(np.arange(0,len(feat_subset),1))
-x.axes.get_yaxis().set_ticklabels(feat_subset);
-x.axes.get_xaxis().set_ticks(np.arange(0,len(feat_subset),1))
-x.axes.get_xaxis().set_ticklabels(feat_subset, rotation='vertical');
-
-# AUCs[39:47:2], flicker MD, DC, DS[71:81], OS, area[66:71]
-plt.subplot(222)
-tables_subset = np.append(median_table[:,39:47:2], np.append(median_table[:,71:81], median_table[:,66:69], axis=1), axis=1)
-feat_subset = np.append(feat_list[39:47:2], np.append(feat_list[71:81], feat_list[66:69]))
-x = plt.imshow(-1*np.corrcoef(np.transpose(tables_subset)), cmap='PuOr', clim=(-1,1))
-plt.plot([3.5,3.5], [-0.5,len(feat_subset)-0.5], '-', color=[0.2,0.7,0.3])
-plt.plot([-0.5,len(feat_subset)-0.5], [3.5,3.5], '-', color=[0.2,0.7,0.3])
-plt.plot([11.5,11.5], [-0.5,len(feat_subset)-0.5], '-', color=[0.2,0.7,0.3])
-plt.plot([-0.5,len(feat_subset)-0.5], [11.5,11.5], '-', color=[0.2,0.7,0.3])
-x.axes.get_yaxis().set_ticks(np.arange(0,len(feat_subset),1))
-x.axes.get_yaxis().set_ticklabels(feat_subset);
-x.axes.get_xaxis().set_ticks(np.arange(0,len(feat_subset),1))
-x.axes.get_xaxis().set_ticklabels(feat_subset, rotation='vertical');
-
-
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/feature covariance matrix subsets.pdf'
-partialfeatfig.savefig(fname, format='pdf', orientation='landscape')
-
 #%% visualize the distribution of RF center vs. surround z-scores, and plot the threshold used for SRF spatial statistic calculations (supplemental figure)
 zstatsfig = plt.figure(figsize=(6, 4))
 hist,bined = np.histogram(np.abs(all_centered_STRFs[39,39,50:,:,:]),bins=300,range=(0,4))
@@ -2248,8 +1264,6 @@ varsupp = plt.figure(figsize=(16, 12));
 for n in range(0,len(cells)):
     plt.subplot(3,4,n+1)
     plt.imshow(all_uncetered_cell_SRFs[:,:,0,cell_inds[n]], origin='lower', cmap='PiYG',clim=[-1,1])
-    # plt.plot(all_flick_resp[2,:,cell_inds[n]].T,'k-')
-    # plt.ylim(-1,2)
     plt.subplot(3,4,n+5)
     current_TRFs = cent_TRFs[:,:,cell_inds[n]]
     plt.plot([0,60],[0,0],'k:')
@@ -2265,106 +1279,3 @@ for n in range(0,len(cells)):
 # save the figure
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/Tm3 within-fly variability.pdf'
 varsupp.savefig(fname, format='pdf', orientation='landscape')
-
-
-#%% functional proofreading blocks - plot individual STRFs for a specified cell type, along with a metric of interest (here, DSI, but this can be changed to any cell-wise metric)
-exstrffig = plt.figure(figsize=(18,12))
-label = 'Mi13'
-
-all_blue_resp = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all_blue_rois.npy')
-label_STRFs = all_centered_STRFs[:,:,:,:,scraped_log[:,14] == label]
-label_n = label_STRFs.shape[4]
-
-# label_STRFs = all_centered_STRFs[:,:,:,:,scraped_log[:,14] == label]
-# label_STRFs = all_smoothed_STRFs[:,:,:,:,scraped_log[:,14] == label]
-label_ds = ds_index[scraped_log[:,14] == label]
-# label_ds = orient_selects[scraped_log[:,14] == label]
-label_cells = scraped_log[scraped_log[:,14] == label,1]
-# label_n = label_STRFs.shape[4]
-
-for cell in range(0,label_n):
-    exstrffig = plt.figure(figsize=(20, 5));
-    plt.suptitle(label_cells[cell] + ', DS =' + str(label_ds[cell]))
-    for n in range(0,10):
-        plt.subplot(2,10,(n+1));
-        # plt.imshow(label_STRFs[:,:,50+(n),cell], origin='lower', cmap='PiYG',clim=[-3,3]);
-
-        plt.imshow(label_STRFs[20:60,20:60,50+(n),0,cell], origin='lower', cmap='PiYG',clim=[-3,3]);
-        # plt.imshow((label_STRFs[20:60,20:60,50+(n),0,cell]+label_STRFs[20:60,20:60,50+(n),1,cell])/2, origin='lower', cmap='PiYG',clim=[-2,2]);
-        plt.title(str(np.round(3-((50+(n))/(20)),2)))
-        plt.subplot(2,10,(n+11));
-        plt.imshow(label_STRFs[20:60,20:60,50+(n),1,cell], origin='lower', cmap='PiYG',clim=[-3,3]);
-        plt.title(str(np.round(3-((50+(n))/(20)),2)))
-    # save the figure
-    fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/' + label + '_' + str(cell) + '_STRF_examples.pdf'
-    exstrffig.savefig(fname, format='pdf', orientation='landscape')
-
-
-
-#%%
-exsrffig = plt.figure(figsize=(18,8))
-label = 'Dm2'
-# label_SRFs = all_uncetered_cell_SRFs[:,:,:,scraped_log[:,14] == label]
-# label_SRFs = mean_peak_SRFs[:,:,:,scraped_log[:,14] == label]
-label_SRFs = all_cell_SRFs[:,:,:,scraped_log[:,14] == label]
-label_cells = scraped_log[scraped_log[:,14] == label,1]
-label_n = label_SRFs.shape[3]
-
-for cell in range(0,label_n):
-    plt.subplot(2,label_n,cell+1)
-    plt.title(label_cells[cell])
-    plt.imshow(label_SRFs[:,:,0,cell], origin='lower', cmap='PiYG',clim=[-1,1]);
-    plt.subplot(2,label_n,label_n+cell+1)
-    plt.imshow(label_SRFs[:,:,1,cell], origin='lower', cmap='PiYG',clim=[-1,1]);
-
-
-# save the figure
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/' + label + '_SRF_examples.pdf'
-exsrffig.savefig(fname, format='pdf', orientation='landscape')
-
-#%%
-meansrffig = plt.figure(figsize=(18,8))
-label = 'Dm13'
-label_SRFs = mean_peak_SRFs[:,:,:,scraped_log[:,14] == label]
-srf_mean = (np.nanmean(label_SRFs[20:60,20:60,0,:],axis=2)+np.nanmean(label_SRFs[20:60,20:60,1,:],axis=2)) /np.nanmax(np.abs((np.nanmean(label_SRFs[20:60,20:60,0,:],axis=2)+np.nanmean(label_SRFs[20:60,20:60,1,:],axis=2))))
-blue_mean = np.nanmean(label_SRFs[20:60,20:60,0,:],axis=2)/np.nanmax(np.abs(np.nanmean(label_SRFs[20:60,20:60,0,:],axis=2)))
-uv_mean = np.nanmean(label_SRFs[20:60,20:60,1,:],axis=2)/np.nanmax(np.abs(np.nanmean(label_SRFs[20:60,20:60,1,:],axis=2)))
-
-plt.suptitle(label + " mean thresholded SRF")
-plt.subplot(1,3,1)
-plt.title('Blue')
-plt.imshow(blue_mean, origin='lower', cmap='PiYG',clim=[-1,1]);
-plt.subplot(1,3,2)
-plt.title('UV')
-plt.imshow(uv_mean, origin='lower', cmap='PiYG',clim=[-1,1]);
-plt.subplot(1,3,3)
-plt.title('Blue+UV')
-plt.imshow(srf_mean, origin='lower', cmap='PiYG',clim=[-1,1]);
-
-
-# save the figure
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/' + label + '_mean_SRF.pdf'
-meansrffig.savefig(fname, format='pdf', orientation='landscape')
-
-#%%
-
-extrffig = plt.figure(figsize=(18,8))
-label = 'Mi14'
-label_TRFs = all_cent_TRFs[:,:,scraped_log[:,14] == label]
-label_cells = scraped_log[scraped_log[:,14] == label,1]
-label_n = label_TRFs.shape[2]
-
-for cell in range(0,label_n):
-    plt.subplot(2,label_n,cell+1)
-    plt.title(label_cells[cell])
-    plt.ylim(-3,3)
-    plt.plot([0,60],[0,0],'k:')
-    plt.plot(label_TRFs[:,0,cell], 'b-');
-    plt.subplot(2,label_n,label_n+cell+1)
-    plt.plot([0,60],[0,0],'k:')
-    plt.plot(label_TRFs[:,1,cell], 'r-');
-    plt.ylim(-3,3)
-
-# save the figure
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/' + label + '_TRF_examples.pdf'
-extrffig.savefig(fname, format='pdf', orientation='landscape')

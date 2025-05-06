@@ -12,7 +12,6 @@ from pathlib import Path
 
 # load STRF data
 base_file_directory = '/oak/stanford/groups/trc/data/Tim/ImagingData/processed/'
-# data_path = os.path.join(base_file_directory,'all_centered_strfs.npy')
 data_path = os.path.join(base_file_directory,'all_smoothed_strfs.npy')
 all_centered_STRFs = np.load(data_path)
 print('Loaded STRF data. Constructing artificial stimulus...')

@@ -1,3 +1,5 @@
+# This script generates response timecourses for each ROI in the excel log. Two STRFs and four flicker responses are saved as .npy files.
+
 from visanalysis.analysis import imaging_data, shared_analysis
 from tac_util import tac_h5_tools
 import numpy as np
@@ -55,24 +57,14 @@ flick_resamp_t = np.arange(0, flick_duration-0.8, 1/flick_resample_rate)
 # populate NaN arrays for blue, uv, and flicker responses, as well as filter nonlinearities
 all_blue_resp = np.full(grid_size+(int(filter_len/tof),np.shape(scraped_log)[0]), np.NaN, dtype='float')
 all_blue_resp_dff = np.full(grid_size+(int(filter_len/tof),np.shape(scraped_log)[0]), np.NaN, dtype='float')
-all_blue_mean_nl = np.full((nbins,2,2,(np.shape(scraped_log)[0])), np.NaN, dtype='float')
-all_blue_nl_fits = np.full((4,2,(np.shape(scraped_log)[0])), np.NaN, dtype='float')
+
 all_uv_resp = np.full(grid_size+(int(filter_len/tof),np.shape(scraped_log)[0]), np.NaN, dtype='float')
 all_uv_resp_dff = np.full(grid_size+(int(filter_len/tof),np.shape(scraped_log)[0]), np.NaN, dtype='float')
-all_uv_mean_nl = np.full((nbins,2,2,(np.shape(scraped_log)[0])), np.NaN, dtype='float')
-all_uv_nl_fits = np.full((4,2,(np.shape(scraped_log)[0])), np.NaN, dtype='float')
+
 all_flick_resp = np.full((flick_conditions,len(flick_resamp_t),np.shape(scraped_log)[0]), np.NaN, dtype='float')
-
-#%% load array with centroid coordinates (units = deg) and convert shifts to actual patch indices
-cent_shifts = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all_shifts.npy')[0:2,:]
-cent_inds = (-1*cent_shifts) + 40
-
-# compress to patch number units
-cent_inds = np.round(cent_inds/5)
 
 # %% for each line in the scraped log, reconstruct the blue STRF
 # this takes about 8 sec per ROI to run (for ~350 ROIS, ~45 min)
-# for roi_ind in range(6, 7):
 for roi_ind in range(0, np.shape(scraped_log)[0]):
     # check if the curent ROI exists
     if scraped_log[roi_ind,4] != '':
@@ -198,112 +190,13 @@ for roi_ind in range(0, np.shape(scraped_log)[0]):
         all_blue_resp[:,:,:,roi_ind] = roi_mean_strf_z
         all_blue_resp_dff[:,:,:,roi_ind] = roi_mean_strf
 
-        # # NONLINEARITY CALCULATION BLOCK
-        # # pull all responses and mean-subtract, to compare to linear predictions
-        # trial_responses = roi_data['epoch_response'][roi_num,:,:]
-        # ms_measured = np.zeros(trial_responses.shape)
-        # for n in range(0,trial_responses.shape[0]):
-        #     ms_measured[n,:] = trial_responses[n,:]-np.mean(trial_responses[n,:])
-        #
-        # # create pre/tail zero vector for padding each trial's stimulus
-        # pt_pad = np.full((int(run_parameters['pre_time']*run_parameters['update_rate']),1),0.5)
-        #
-        # # define timepoints of padded convolution (used to resample the prediction at imaging rate)
-        # # the weird start and stop time account for the 3-frame lag and indexing shift (-1)
-        # conv_t = np.arange(2/run_parameters['update_rate'],49+1/run_parameters['update_rate'],1/run_parameters['update_rate'])
-        #
-        # # initialize array to hold convolution products (h,w,trial,time), which will have non-valid overhangs trimmed out
-        # lin_preds = np.zeros((all_stims.shape[0:2] + all_stims.shape[3:] + (all_stims.shape[2] + 2*len(pt_pad) - 1,)))
-        # ds_preds = np.zeros((all_stims.shape[0:2] + all_stims.shape[3:] + (len(roi_data['time_vector']),)))
-        #
-        # # perform patch-wise convolution, stimulus and lin_preds output will have same timing
-        # for w in range(0,all_stims.shape[0]):
-        #     for h in range(0,all_stims.shape[1]):
-        #         for trial in range(0,all_stims.shape[3]):
-        #             current_TRF = trial_strfs[h,w,:,trial]
-        #             current_stim = np.append(pt_pad,np.append(all_stims[h,w,:,trial],pt_pad))-0.5
-        #             lin_preds[h,w,trial,:] = np.convolve(current_stim, current_TRF, mode='full')[int(len(current_TRF)/2):current_stim.shape[0]-1+int(len(current_TRF)/2)]
-        #             # evaluate the interpolated prediction at imaging frame times
-        #             ds_preds[h,w,trial,:] = np.interp(cfts[trial_num,:],conv_t,lin_preds[h,w,trial,:])
-        #
-        # # calculate mean prediction by averaging over patches (resulting dims = trials, time), then trim mean gray periods
-        # joint_pred = np.mean(ds_preds[:,:,:,:],axis=(0,1))
-        #
-        # # sort and flatten the measured and predicted arrays using the sorted measured array indices
-        # flat_pred = joint_pred.flatten()
-        # flat_measured = ms_measured.flatten()
-        # sorted_inds = np.argsort(flat_pred, axis=None)
-        # sorted_pred = flat_pred[sorted_inds]
-        # sorted_measured = flat_measured[sorted_inds]
-        #
-        # # find the binned averages for predicted and measured responses
-        # nbin_width = int(len(sorted_measured)/nbins)
-        # pred_binmeans = np.zeros((nbins,1))
-        # measured_binmeans = np.zeros((nbins,1))
-        # for bin in range(0,nbins):
-        #     measured_binmeans[bin] = np.mean(sorted_measured[nbin_width*bin:nbin_width*(bin+1)])
-        #     pred_binmeans[bin] = np.mean(sorted_pred[nbin_width*bin:nbin_width*(bin+1)])
-        #
-        # # try to fit a sigmoid to the data cloud defined by (predicted,measured); if no fit can be found due to the data's shape, fit a line instead
-        # try:
-        #     xdata = sorted_pred
-        #     ydata = sorted_measured
-        #     p0 = [np.max(ydata), 0, 1, 0] #initial conditions for gradient descent
-        #     popt, pcov = curve_fit(sigmoid, xdata, ydata, p0, method='lm')
-        #     all_blue_nl_fits[:,0,roi_ind] = popt
-        # except:
-        #     xdata = sorted_pred
-        #     ydata = sorted_measured
-        #     p0 = [1, 0] #initial conditions for gradient descent
-        #     popt, pcov = curve_fit(line, xdata, ydata, p0, method='lm')
-        #     all_blue_nl_fits[2:4,0,roi_ind] = popt
-        #
-        # # repeat these calculations using the 'bounding box' method, subsampling the STRF 5 samples in all directions from the previously calculated centroid (if the edge of the array is reached in any direction, truncate the size of the bounding box)
-        # joint_pred = np.mean(ds_preds[np.max([int(cent_inds[0,roi_ind])-4,0]): np.min([int(cent_inds[0,roi_ind])+4,16]),np.max([int(cent_inds[1,roi_ind])-4,0]): np.min([int(cent_inds[1,roi_ind])+4,16]),:,:],axis=(0,1))
-        #
-        # flat_pred = joint_pred.flatten()
-        # flat_measured = ms_measured.flatten()
-        # sorted_inds = np.argsort(flat_pred, axis=None)
-        # bb_sorted_pred = flat_pred[sorted_inds]
-        # bb_sorted_measured = flat_measured[sorted_inds]
-        # bb_pred_binmeans = np.zeros((nbins,1))
-        # bb_measured_binmeans = np.zeros((nbins,1))
-        # for bin in range(0,nbins):
-        #     bb_measured_binmeans[bin] = np.mean(bb_sorted_measured[nbin_width*bin:nbin_width*(bin+1)])
-        #     bb_pred_binmeans[bin] = np.mean(bb_sorted_pred[nbin_width*bin:nbin_width*(bin+1)])
-        #
-        # # try to fit a sigmoid to the data cloud defined by (predicted,measured); if no fit can be found due to the data's shape, fit a line instead
-        # try:
-        #     xdata = bb_sorted_pred
-        #     ydata = bb_sorted_measured
-        #     p0 = [np.max(ydata), 0, 1, 0] #initial conditions for gradient descent
-        #     bb_popt, bb_pcov = curve_fit(sigmoid, xdata, ydata, p0, method='lm')
-        #     all_blue_nl_fits[:,1,roi_ind] = bb_popt
-        # except:
-        #     xdata = bb_sorted_pred
-        #     ydata = bb_sorted_measured
-        #     p0 = [1, 0] #initial conditions for gradient descent
-        #     bb_popt, bb_pcov = curve_fit(line, xdata, ydata, p0, method='lm')
-        #     all_blue_nl_fits[2:4,1,roi_ind] = bb_popt
-        #
-        # # output variables are: mean_nl, a 3D array with 1st dimension 'bin', 2nd dimension holding the predicted and measured mean values, and 3rd dimension 'prediction type'; and sig_params, a 2D array with 1st dimension 'parameter' including L (curve height), x0 (curve midpoint), k (slope) and b (vertical bias) for the sigmoid function, and 2nd dimension 'prediction type'. To recover the nl curves, plot mean_nl[:,1,n] against mean_nl[:,0,n]. To recover the fit curve, redefine the sigmoid function in the top block
-        # mean_nl = np.zeros(all_blue_mean_nl.shape[0:3])
-        # mean_nl[:,:,0] = np.append(measured_binmeans,pred_binmeans,axis=1)
-        # mean_nl[:,:,1] = np.append(bb_measured_binmeans,bb_pred_binmeans,axis=1)
-        # all_blue_mean_nl[:,:,:,roi_ind] = mean_nl
-
-
-
 # save mean, dc-subtracted, z-scored STRF, and nonlinearity summaries
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_blue_rois.npy', all_blue_resp)
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_blue_rois_dff.npy', all_blue_resp_dff)
-# np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_blue_mean_NLs.npy', all_blue_mean_nl)
-# np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_blue_NL_fits.npy', all_blue_nl_fits)
 
 
 # %% reconstruct all UV STRFs
 # this takes about 3 sec per ROI to run (for ~350 ROIS, ~18 min)
-# for roi_ind in range(428, 429):
 for roi_ind in range(0, np.shape(scraped_log)[0]):
     # check if the curent ROI exists
     if scraped_log[roi_ind,7] != '':
@@ -429,106 +322,9 @@ for roi_ind in range(0, np.shape(scraped_log)[0]):
         all_uv_resp[:,:,:,roi_ind] = roi_mean_strf_z
         all_uv_resp_dff[:,:,:,roi_ind] = roi_mean_strf
 
-        # # NONLINEARITY CALCULATION BLOCK
-        # # pull all responses and mean-subtract, to compare to linear predictions
-        # trial_responses = roi_data['epoch_response'][roi_num,:,:]
-        # ms_measured = np.zeros(trial_responses.shape)
-        # for n in range(0,trial_responses.shape[0]):
-        #     ms_measured[n,:] = trial_responses[n,:]-np.mean(trial_responses[n,:])
-        #
-        # # create pre/tail zero vector for padding each trial's stimulus
-        # pt_pad = np.full((int(run_parameters['pre_time']*run_parameters['update_rate']),1),0.5)
-        #
-        # # define timepoints of padded convolution (used to resample the prediction at imaging rate)
-        # # the weird start and stop time account for the 3-frame lag and indexing shift (-1)
-        # conv_t = np.arange(2/run_parameters['update_rate'],49+1/run_parameters['update_rate'],1/run_parameters['update_rate'])
-        #
-        # # initialize array to hold convolution products (h,w,trial,time), which will have non-valid overhangs trimmed out
-        # lin_preds = np.zeros((all_stims.shape[0:2] + all_stims.shape[3:] + (all_stims.shape[2] + 2*len(pt_pad) - 1,)))
-        # ds_preds = np.zeros((all_stims.shape[0:2] + all_stims.shape[3:] + (len(roi_data['time_vector']),)))
-        #
-        # # perform patch-wise convolution, stimulus and lin_preds output will have same timing
-        # for w in range(0,all_stims.shape[0]):
-        #     for h in range(0,all_stims.shape[1]):
-        #         for trial in range(0,all_stims.shape[3]):
-        #             current_TRF = trial_strfs[h,w,:,trial]
-        #             current_stim = np.append(pt_pad,np.append(all_stims[h,w,:,trial],pt_pad))-0.5
-        #             lin_preds[h,w,trial,:] = np.convolve(current_stim, current_TRF, mode='full')[int(len(current_TRF)/2):current_stim.shape[0]-1+int(len(current_TRF)/2)]
-        #             # evaluate the interpolated prediction at imaging frame times
-        #             ds_preds[h,w,trial,:] = np.interp(cfts[trial_num,:],conv_t,lin_preds[h,w,trial,:])
-        #
-        # # calculate mean prediction by averaging over patches (resulting dims = trials, time), then trim mean gray periods
-        # joint_pred = np.mean(ds_preds[:,:,:,:],axis=(0,1))
-        #
-        # # sort and flatten the measured and predicted arrays using the sorted measured array indices
-        # flat_pred = joint_pred.flatten()
-        # flat_measured = ms_measured.flatten()
-        # sorted_inds = np.argsort(flat_pred, axis=None)
-        # sorted_pred = flat_pred[sorted_inds]
-        # sorted_measured = flat_measured[sorted_inds]
-        #
-        # # find the binned averages for predicted and measured responses
-        # nbin_width = int(len(sorted_measured)/nbins)
-        # pred_binmeans = np.zeros((nbins,1))
-        # measured_binmeans = np.zeros((nbins,1))
-        # for bin in range(0,nbins):
-        #     measured_binmeans[bin] = np.mean(sorted_measured[nbin_width*bin:nbin_width*(bin+1)])
-        #     pred_binmeans[bin] = np.mean(sorted_pred[nbin_width*bin:nbin_width*(bin+1)])
-        #
-        # # try to fit a sigmoid to the data cloud defined by (predicted,measured); if no fit can be found due to the data's shape, fit a line instead
-        # try:
-        #     xdata = sorted_pred
-        #     ydata = sorted_measured
-        #     p0 = [np.max(ydata), 0, 1, 0] #initial conditions for gradient descent
-        #     popt, pcov = curve_fit(sigmoid, xdata, ydata, p0, method='lm')
-        #     all_uv_nl_fits[:,0,roi_ind] = popt
-        # except:
-        #     xdata = sorted_pred
-        #     ydata = sorted_measured
-        #     p0 = [1, 0] #initial conditions for gradient descent
-        #     popt, pcov = curve_fit(line, xdata, ydata, p0, method='lm')
-        #     all_uv_nl_fits[2:4,0,roi_ind] = popt
-        #
-        # # repeat these calculations using the 'bounding box' method, subsampling the STRF 5 samples in all directions from the previously calculated centroid (if the edge of the array is reached in any direction, truncate the size of the bounding box)
-        # joint_pred = np.mean(ds_preds[np.max([int(cent_inds[0,roi_ind])-4,0]): np.min([int(cent_inds[0,roi_ind])+4,16]),np.max([int(cent_inds[1,roi_ind])-4,0]): np.min([int(cent_inds[1,roi_ind])+4,16]),:,:],axis=(0,1))
-        #
-        # flat_pred = joint_pred.flatten()
-        # flat_measured = ms_measured.flatten()
-        # sorted_inds = np.argsort(flat_pred, axis=None)
-        # bb_sorted_pred = flat_pred[sorted_inds]
-        # bb_sorted_measured = flat_measured[sorted_inds]
-        # bb_pred_binmeans = np.zeros((nbins,1))
-        # bb_measured_binmeans = np.zeros((nbins,1))
-        # for bin in range(0,nbins):
-        #     bb_measured_binmeans[bin] = np.mean(bb_sorted_measured[nbin_width*bin:nbin_width*(bin+1)])
-        #     bb_pred_binmeans[bin] = np.mean(bb_sorted_pred[nbin_width*bin:nbin_width*(bin+1)])
-        #
-        # # try to fit a sigmoid to the data cloud defined by (predicted,measured); if no fit can be found due to the data's shape, fit a line instead
-        # try:
-        #     xdata = bb_sorted_pred
-        #     ydata = bb_sorted_measured
-        #     p0 = [np.max(ydata), 0, 1, 0] #initial conditions for gradient descent
-        #     bb_popt, bb_pcov = curve_fit(sigmoid, xdata, ydata, p0, method='lm')
-        #     all_uv_nl_fits[:,1,roi_ind] = bb_popt
-        # except:
-        #     xdata = bb_sorted_pred
-        #     ydata = bb_sorted_measured
-        #     p0 = [1, 0] #initial conditions for gradient descent
-        #     bb_popt, bb_pcov = curve_fit(line, xdata, ydata, p0, method='lm')
-        #     all_uv_nl_fits[2:4,1,roi_ind] = bb_popt
-        #
-        # # output variables are: mean_nl, a 3D array with 1st dimension 'bin', 2nd dimension holding the predicted and measured mean values, and 3rd dimension 'prediction type'; and sig_params, a 2D array with 1st dimension 'parameter' including L (curve height), x0 (curve midpoint), k (slope) and b (vertical bias) for the sigmoid function, and 2nd dimension 'prediction type'. To recover the nl curves, plot mean_nl[:,1,n] against mean_nl[:,0,n]. To recover the fit curve, redefine the sigmoid function in the top block
-        # mean_nl = np.zeros(all_uv_mean_nl.shape[0:3])
-        # mean_nl[:,:,0] = np.append(measured_binmeans,pred_binmeans,axis=1)
-        # mean_nl[:,:,1] = np.append(bb_measured_binmeans,bb_pred_binmeans,axis=1)
-        # all_uv_mean_nl[:,:,:,roi_ind] = mean_nl
-
 # save mean, dc-subtracted, z-scored STRF, and nonlinearity summaries
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_uv_rois.npy', all_uv_resp)
 np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_uv_rois_dff.npy', all_uv_resp_dff)
-# np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_uv_mean_NLs.npy', all_uv_mean_nl)
-# np.save('/Volumes/TBD/Bruker/STRFs/compiled/all_uv_NL_fits.npy', all_uv_nl_fits)
-
 
 # %% calculate and save all flicker responses
 for roi_ind in range(0, np.shape(scraped_log)[0]):

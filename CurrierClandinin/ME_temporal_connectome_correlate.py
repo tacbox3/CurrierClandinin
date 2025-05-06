@@ -1,3 +1,5 @@
+# This script performs weighted summation modeling on both temporal filters and concatenated flicker response timecourses, as well as functional clustering and strong vs. weak input sampling analysis (i.e., all of Fig. 6)
+
 from visanalysis.analysis import imaging_data, shared_analysis
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,9 +46,6 @@ for roi_ind in range(0, np.shape(scraped_log)[0]):
 
 # load connectome summary metrics - spatial table from Michael
 book = xlrd.open_workbook('/Users/tcurrier/Desktop/Clandinin Lab/Connectomics/NernReiser2024 Data/HighN_InFracs_T4in_excluded.xls')
-# book = xlrd.open_workbook('/Users/tcurrier/Desktop/Clandinin Lab/Connectomics/NernReiser2024 Data/HighN_InFracs_T4_excluded.xls')
-# book = xlrd.open_workbook('/Users/tcurrier/Desktop/Clandinin Lab/Connectomics/NernReiser2024 Data/HighN_InFracs_T4in_excluded_plusPR.xls')
-# book = xlrd.open_workbook('/Users/tcurrier/Desktop/Clandinin Lab/Connectomics/NernReiser2024 Data/HighN_InFracs_T4compiled.xls')
 sheet = book.sheet_by_name('Nern 2024')
 data = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(sheet.nrows)]
 infrac_data = np.asarray(data)
@@ -61,10 +60,7 @@ infrac_data = infrac_data[2:,1:].astype('float32')
 
 # manual entry of NT identity for cell types in infrac_types
 infrac_NTs = np.asarray(['GABA','GABA','GABA','Glu','Glu','ACh','Glu','Glu','Glu','Glu','Glu','ACh','ACh','ACh','ACh','Glu','ACh','Glu','GABA','Glu','GABA','GABA','GABA','GABA','GABA','GABA','ACh','ACh','ACh','ACh','ACh','ACh','ACh','ACh','Glu','ACh','Glu','ACh','ACh','ACh','ACh','Glu','GABA','Glu','ACh','ACh','Glu','ACh','Glu'])
-# for PR included
-# infrac_NTs = np.asarray(['GABA','GABA','GABA','Glu','Glu','ACh','Glu','Glu','Glu','Glu','Glu','ACh','ACh','ACh','ACh','Glu','ACh','Glu','GABA','Glu','GABA','GABA','GABA','GABA','GABA','GABA','His','ACh','ACh','ACh','ACh','ACh','ACh','ACh','ACh','Glu','ACh','Glu','ACh','ACh','ACh','ACh','Glu','GABA','Glu','ACh','ACh','Glu','ACh','Glu'])
-# for T4 included
-# infrac_NTs = np.asarray(['GABA','GABA','GABA','Glu','Glu','ACh','Glu','Glu','Glu','Glu','Glu','ACh','ACh','ACh','ACh','Glu','ACh','Glu','GABA','Glu','GABA','GABA','GABA','GABA','GABA','GABA','ACh','ACh','ACh','ACh','ACh','ACh','ACh','Glu','ACh','Glu','ACh','ACh','ACh','ACh','Glu','GABA','Glu','ACh','ACh','Glu','ACh','Glu'])
+
 # for inhibitory input cell types, flip the sign of the connection weight
 for ind in range(0,len(infrac_types)):
     if not infrac_NTs[ind] == 'ACh':
@@ -74,7 +70,6 @@ for ind in range(0,len(infrac_types)):
 all_cent_TRFs = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all_center_TRFs.npy')
 all_surr_TRFs = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all_surround_TRFs.npy')
 all_flicks = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all_flick_rois.npy')
-# pc_weights = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all_PC_weights.npy')
 pc_weights = np.load('/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/full_PC_weights.npy')
 
 # define flicker time vector and frequencies
@@ -155,22 +150,6 @@ for ind in range(0,len(unique_types)):
         cmat = np.tril(np.corrcoef(nl_concat_flicks, rowvar=False), k=-1)
         flick_pair_corrs[current_label] = cmat[np.nonzero(cmat)]
 
-#%% create pickle files to save the within-type cross-correlation dictionaries
-import pickle
-basepath = '/Volumes/TBD/Bruker/STRFs/compiled/'
-# TRF corrs
-f = open(os.path.join(basepath, 'within-type_pairwise_TRF_correlations.pkl'),'wb')
-pickle.dump(TRF_pair_corrs,f)
-f.close()
-# surround TRF corrs
-f = open(os.path.join(basepath, 'within-type_pairwise_surround_TRF_correlations.pkl'),'wb')
-pickle.dump(surr_TRF_pair_corrs,f)
-f.close()
-# flicker corrs
-f = open(os.path.join(basepath, 'within-type_pairwise_flicker_correlations.pkl'),'wb')
-pickle.dump(flick_pair_corrs,f)
-f.close()
-
 #%% construct mean-vs-mean correlation table for all cell type pairs in the infrac_types list
 
 # define threshold on infrac (discards connections below this level). a 1% higher threshold will cut off approximately 1-4 additional synapses, depending on the cell type. a threshold of 2 is the closest match to the "standard" 5 synapse cutoff
@@ -218,8 +197,6 @@ np.fill_diagonal(cTRF_corrs_table, np.nan)
 np.fill_diagonal(sTRF_corrs_table, np.nan)
 np.fill_diagonal(flick_corrs_table, np.nan)
 np.fill_diagonal(pc_dists_table, np.nan)
-# fill PC table diagonal with 0s (no distance)
-# np.fill_diagonal(pc_dists_table, 0)
 
 # define vectorized versions for plotting, taking only indices with non-zero input fractions
 infrac_vec = infrac_data.flatten()[np.nonzero(infrac_data.flatten())]
@@ -606,8 +583,6 @@ if np.logical_or(fn_cn_k > np.quantile(shuffled_slopes,0.975), fn_cn_k < np.quan
     plt.plot(2,0,'k*')
 
 
-
-
 # PC DIST VS. INFRAC
 plt.subplot(3,3,8)
 fn_var = thresh_pc_vec[thresh_infrac_vec > 0]
@@ -630,7 +605,6 @@ plt.plot(np.arange(0,75,1),np.arange(0,75,1)*fn_cn_k+popt[1],'r-')
 plt.title('R = ' + str(fn_cn_R) + ', k = ' + str(np.round(fn_cn_k,5)) + ' /%')
 plt.ylabel('Pairwise Distance in PC Space')
 plt.xlabel('Input Fraction (%)')
-# plt.ylim([-1.05,1.05])
 # shuffle with replacement
 shuffs_fn_var = np.random.choice(nl_fn_var, size=(len(nl_fn_var),numshuffles), replace=True)
 # find slope for each shuffle
@@ -733,7 +707,6 @@ binwidths = 20 # width of bins in units of input %
 # construct container for appending binned Rs
 binned_Rs = np.full((int(100/binwidths),1), np.nan, dtype='float')
 binned_flick_Rs = np.full((int(100/binwidths),1), np.nan, dtype='float')
-# binned_pcd = np.full((int(100/binwidths),1), np.nan, dtype='float')
 
 # container arrays
 first_input_infrac = np.zeros(len(infrac_types))
@@ -824,7 +797,6 @@ for post_ind in range(0,len(infrac_types)):
 # TRF plot props
 plt.subplot(3,4,1)
 plt.plot(np.arange(binwidths/2,100+binwidths/2,binwidths), np.nanmedian(binned_Rs, axis=1), '-', linewidth=2, color=[0.3,0.6,1])
-# plt.plot([60,60],[-1.1,1.1],':',color=[0.8,0.2,0.2])
 plt.ylabel('Similarity to Post-Synaptic TRF (R)')
 plt.xlabel('Cumulative Input Fraction')
 plt.title('Connection-Weighted Sum of Pre-Synaptic TRFs')
@@ -937,7 +909,6 @@ plt.text(7-0.25,-1.4, 'unused')
 # flicker plot props
 plt.subplot(3,4,5)
 plt.plot(np.arange(binwidths/2,100+binwidths/2,binwidths), np.nanmedian(binned_flick_Rs, axis=1), '-', linewidth=2, color=[1,0.3,0.3])
-# plt.plot([60,60],[-1.1,1.1],':',color=[0.8,0.2,0.2])
 plt.ylabel('Similarity to Post-Syn. Flicker Response (R)')
 plt.xlabel('Cumulative Input Fraction')
 plt.title('Cnx-Weighted Sum of Pre-Syn. Flicker Responses')
@@ -945,7 +916,6 @@ plt.xlim(0,100)
 plt.ylim(-1.1,1.1)
 plt.subplot(3,4,6)
 plt.plot([20,20],[-1,1],':',color=[0.5,0.5,0.5])
-# plt.scatter(flick_infrac_at_pk_corrs, flick_peak_corrs, s=20, color=[0.2,0.2,0.2])
 plt.scatter(first_input_infrac, flick_first_input_corrs, s=20, color=[0.2,0.2,0.2])
 # correlation coefficient
 corrmat = np.corrcoef(np.asarray([first_input_infrac,flick_first_input_corrs]))
@@ -1054,7 +1024,7 @@ plt.text(7-0.25,-1.4, 'unused')
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/temporal similarity vs cumulative input fraction.pdf'
 tempcumfig.savefig(fname, format='pdf', orientation='landscape')
 
-#%% cumulative input fraction stats
+#%% cumulative input fraction statistics
 
 np.median(total_infracs)
 np.mean(total_infracs)
@@ -1073,34 +1043,6 @@ plt.xlabel('%'' of total input by main dataset cell types')
 # save it
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/total input fraction distribution.pdf'
 infracdistfig.savefig(fname, format='pdf', orientation='landscape')
-
-#%% pie charts of cell categories
-tempcatfig = plt.figure(figsize=(15, 8))
-
-plt.subplot(121)
-plt.title('Center TRF')
-cats = ['High R with largest input', 'R low->high with more inputs', 'Strong negative R', 'No/weak corr with inputs']
-cat1_inds = first_input_corrs > 0.5
-cat2_inds = np.logical_and(first_input_corrs < 0.5, last_input_corrs > 0.5)
-cat3_inds = np.logical_and(first_input_corrs < -0.5, last_input_corrs < -0.5)
-cat4_inds = np.logical_and(np.logical_and(~cat1_inds, ~cat2_inds), ~cat3_inds)
-catfracs = np.asarray([len(infrac_types[cat1_inds]), len(infrac_types[cat2_inds]), len(infrac_types[cat3_inds]), len(infrac_types[cat4_inds])])/len(infrac_types)
-plt.pie(catfracs, labels=cats, startangle=0, counterclock=False, colors=np.transpose(np.repeat(np.asarray([0.3,0.6,1]).reshape(-1,1),4,axis=1)*np.arange(1,0,-0.3)));
-
-plt.subplot(122)
-plt.title('Flicker')
-cats = ['High R with largest input', 'R low->high with more inputs', 'Strong negative R', 'No/weak corr with inputs']
-cat1_inds = flick_first_input_corrs > 0.5
-cat2_inds = np.logical_and(flick_first_input_corrs < 0.5, flick_last_input_corrs > 0.5)
-cat3_inds = np.logical_and(flick_first_input_corrs < -0.5, flick_last_input_corrs < -0.5)
-cat4_inds = np.logical_and(np.logical_and(~cat1_inds, ~cat2_inds), ~cat3_inds)
-catfracs = np.asarray([len(infrac_types[cat1_inds]), len(infrac_types[cat2_inds]), len(infrac_types[cat3_inds]), len(infrac_types[cat4_inds])])/len(infrac_types)
-plt.pie(catfracs, labels=cats, startangle=-90, counterclock=False, colors=np.transpose(np.repeat(np.asarray([1,0.3,0.3]).reshape(-1,1),4,axis=1)*np.arange(1,0,-0.3)));
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/temporal similarity - cumulative input categories.pdf'
-tempcatfig.savefig(fname, format='pdf', orientation='landscape')
-
 
 #%% plot input fraction distribution and relevant thresholds
 
@@ -1204,7 +1146,6 @@ clustered_types = resorted_types
 num_fn_clusts = np.max(clust_IDs)+1
 fn_clust_IDs = clust_IDs
 # plotting
-# plt.subplot(2,2,1)
 plt.title('PC space distance, nclust =' + str(num_fn_clusts))
 x = plt.imshow(reresorted_data, cmap='pink', clim=[10,80])
 plt.colorbar(shrink=0.5,aspect=8,ticks=[10,45,80])
@@ -1396,578 +1337,3 @@ plt.text(0,0.8,'p = ' + str(np.round(kr_wk.pvalue,4)))
 plt.suptitle('Sampling of Functional Clusters Among Strong or Weak Inputs, infrac_thresh=' + str(infrac_thresh))
 fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/sampling of functional clusters for weak-strong inputs(infrac_thresh=' + str(infrac_thresh) + ').pdf'
 inclustfig.savefig(fname, format='pdf', orientation='portrait')
-
-#%% plot physiological similarity as a function of connection similarity
-from sklearn.cluster import AgglomerativeClustering
-
-# define threshold for plotting, N>2 ==> nclusts=5; N>0 ==> nclusts=10
-# these nclusts were previously found in an unbiased manner via AffinityPropagation, but to keep the two sort direction comparison fair, we want to mandate a certain number of clusters for this final plot
-thresh_n = 2
-nclusts = 5
-numshuffles = 10000
-
-# open connection similarity matrix from sebastian
-book = xlrd.open_workbook('/Users/tcurrier/Desktop/Clandinin Lab/Connectomics/FAFB_distances_culled.xls')
-sheet = book.sheet_by_name('typetotypedistances')
-data = [[sheet.cell_value(r, c) for c in range(sheet.ncols)] for r in range(sheet.nrows)]
-full_cnx_dist = np.asarray(data)
-
-# grab cell labels and data as separate variables
-cnx_dist_types = full_cnx_dist[0,1:]
-cnx_dist_mat = full_cnx_dist[1:,1:].astype('float')
-
-# sort by cell type labels so connectome and physiology matricies use same indices per type
-cnx_dist_mat[np.argsort(cnx_dist_types),:][:,np.argsort(cnx_dist_types)]
-cnx_dist_types = np.sort(cnx_dist_types)
-
-# remove MeTu and PR types from physiology table, as these were not included in the type-to-type distances matrix that sebastian gave me. Also need to remove Tm40, which is not a cell type in the FAFB dataset
-phys_dist_types = unique_types
-culled_Nbytype = Nbytype
-
-culled_pc_dists_table = pc_dists_table[~(phys_dist_types == 'R7p'),:][:,~(phys_dist_types == 'R7p')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'R7p')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'R7p')]
-culled_pc_dists_table = culled_pc_dists_table[~(phys_dist_types == 'R7y'),:][:,~(phys_dist_types == 'R7y')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'R7y')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'R7y')]
-culled_pc_dists_table = culled_pc_dists_table[~(phys_dist_types == 'R8p'),:][:,~(phys_dist_types == 'R8p')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'R8p')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'R8p')]
-culled_pc_dists_table = culled_pc_dists_table[~(phys_dist_types == 'R8y'),:][:,~(phys_dist_types == 'R8y')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'R8y')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'R8y')]
-culled_pc_dists_table = culled_pc_dists_table[~(phys_dist_types == 'MeTu1'),:][:,~(phys_dist_types == 'MeTu1')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'MeTu1')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'MeTu1')]
-culled_pc_dists_table = culled_pc_dists_table[~(phys_dist_types == 'MeTu4d'),:][:,~(phys_dist_types == 'MeTu4d')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'MeTu4d')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'MeTu4d')]
-culled_pc_dists_table = culled_pc_dists_table[~(phys_dist_types == 'Tm40'),:][:,~(phys_dist_types == 'Tm40')]
-culled_Nbytype = culled_Nbytype[~(phys_dist_types == 'Tm40')]
-phys_dist_types = phys_dist_types[~(phys_dist_types == 'Tm40')]
-
-# remove cell types giving nans in culled pc dist table
-culled_Nbytype = culled_Nbytype[~np.isnan(culled_pc_dists_table)[0]]
-cnx_dist_types = cnx_dist_types[~np.isnan(culled_pc_dists_table)[0]]
-phys_dist_types = phys_dist_types[~np.isnan(culled_pc_dists_table)[0]]
-cnx_dist_mat = cnx_dist_mat[~np.isnan(culled_pc_dists_table)[0],:][:,~np.isnan(culled_pc_dists_table)[0]]
-culled_pc_dists_table = culled_pc_dists_table[~np.isnan(culled_pc_dists_table)[0],:][:,~np.isnan(culled_pc_dists_table)[0]]
-
-# create a thresholded copy of each table (rows and columns removed for cell types where N does not meet threshold)
-thresh_pc_dists_table = culled_pc_dists_table[culled_Nbytype > thresh_n,:][:,culled_Nbytype > thresh_n]
-thresh_cnx_dist_mat = cnx_dist_mat[culled_Nbytype > thresh_n,:][:,culled_Nbytype > thresh_n]
-thresh_phys_dist_types = phys_dist_types[culled_Nbytype > thresh_n]
-thresh_cnx_dist_types = cnx_dist_types[culled_Nbytype > thresh_n]
-
-#%% plot section
-similarityfig = plt.figure(figsize=(15, 10))
-
-# PC DISTANCE VS. CNX SIMILARITY
-plt.subplot(2,4,4)
-fn_var = np.tril(thresh_pc_dists_table).flatten()
-cn_var = np.tril(thresh_cnx_dist_mat).flatten()
-# remove nans
-nl_cn_var = cn_var[~np.isnan(fn_var)]
-nl_fn_var = fn_var[~np.isnan(fn_var)]
-# remove self-similarity and zero-d out upper triangle
-nl_fn_var = nl_fn_var[np.nonzero(nl_cn_var)]
-nl_cn_var = nl_cn_var[np.nonzero(nl_cn_var)]
-# correlation coefficient
-corrmat = np.corrcoef(np.asarray([nl_cn_var,nl_fn_var]))
-fn_cn_R = np.round(corrmat[0,1],2)
-# linear fit
-xdata = nl_cn_var
-ydata = nl_fn_var
-p0 = [1, 50] #initial conditions for gradient descent
-popt, pcov = curve_fit(line, xdata, ydata, p0, method='lm')
-fn_cn_k = popt[0]
-# scatter data
-plt.scatter(nl_cn_var,nl_fn_var,color=[0,0,0],s=8)
-plt.plot(np.arange(0.4,1.05,.01),np.arange(0.4,1.05,.01)*fn_cn_k+popt[1],'r-')
-plt.title('R = ' + str(fn_cn_R) + ', k = ' + str(np.round(fn_cn_k,2)))
-plt.ylabel('Pairwise Euclidean Distance (PC space)')
-plt.xlabel('FAFB Connection Distance')
-# binned version of plot
-plt.subplot(2,4,7)
-binned_cn_var = np.digitize(nl_cn_var, np.arange(0,1.015,0.015))
-binned_matrix = np.zeros((len(np.arange(0,1.015,0.015))-1,len(np.arange(0,83,3))-1))
-for bin in range(0,len(np.arange(0,1.015,0.015))-1):
-    binned_fn_on_cn_bin = np.histogram(nl_fn_var[binned_cn_var==bin], bins=np.arange(0,83,3))[0]
-    if np.any(np.nonzero(binned_fn_on_cn_bin)):
-        binned_matrix[bin,:] = binned_fn_on_cn_bin
-x = plt.imshow(-1*binned_matrix.T, cmap='bone', origin='lower')
-plt.colorbar(shrink=0.5,aspect=8)
-# set ticks
-np.arange(0,len(np.arange(0,83,3)),1)
-x.axes.get_yaxis().set_ticks(np.arange(0,len(np.arange(0,83,3)),8))
-x.axes.get_yaxis().set_ticklabels(np.arange(0,83,24));
-x.axes.get_xaxis().set_ticks(np.arange(0,len(np.arange(0,1.015,0.015)),10))
-x.axes.get_xaxis().set_ticklabels(np.round(np.arange(0,1.015,0.15),2));
-
-plt.subplot(2,4,8)
-histo=np.sum(binned_matrix,axis=0)
-plt.plot(histo,np.arange(0,83,3)[:len(histo)],'k-')
-plt.title('Functional Distance Marginal')
-
-plt.subplot(2,4,3)
-histo=np.sum(binned_matrix,axis=1)
-plt.plot(np.arange(0,1.015,0.015)[:len(histo)],histo,'k-')
-plt.title('Connection Graph Distance Marginal')
-
-# cluster on connection distance, plot physiology distance by sorted cnx clusts
-# CLUSTER BLOCK
-# define matrix to cluster on
-input_matrix = thresh_cnx_dist_mat
-input_labels = thresh_cnx_dist_types
-mirror_matrix = thresh_pc_dists_table
-# train and fit the agglomerative/KMeans clustering model
-clust_model = AgglomerativeClustering(n_clusters=nclusts)
-clust_IDs = clust_model.fit_predict(input_matrix)
-# reorganize the distances matrix by cluster. within each cluster, sort cell types by mean distance, from closest to furthest
-resorted_data = np.zeros(input_matrix.shape[0]).reshape(1,-1)
-resorted_mirror = np.zeros(mirror_matrix.shape[0]).reshape(1,-1)
-resorted_types = np.full(1,'',dtype='<U32')
-for clust in range(0,np.max(clust_IDs)+1):
-    clust_sortinds = np.argsort(np.mean(np.abs(input_matrix[clust_IDs==clust,:]),axis=1))
-    resorted_mirror = np.append(resorted_mirror, mirror_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-    resorted_data = np.append(resorted_data, input_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-    resorted_types = np.append(resorted_types, input_labels[clust_IDs==clust][clust_sortinds])
-# trim initialization axis
-resorted_mirror = resorted_mirror[1:,:]
-resorted_data = resorted_data[1:,:]
-resorted_types = resorted_types[1:]
-# repeat to sort matrix columns
-reresorted_data = np.zeros(resorted_data.shape[0]).reshape(-1,1)
-reresorted_mirror = np.zeros(resorted_mirror.shape[0]).reshape(-1,1)
-for clust in range(0,np.max(clust_IDs)+1):
-    clust_sortinds = np.argsort(np.mean(np.abs(resorted_data[:,clust_IDs==clust]),axis=0))
-    reresorted_mirror = np.append(reresorted_mirror, resorted_mirror[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-    reresorted_data = np.append(reresorted_data, resorted_data[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-reresorted_data = reresorted_data[:,1:]
-reresorted_mirror = reresorted_mirror[:,1:]
-# plotting
-plt.subplot(2,4,1)
-plt.title('FAFB connection distance, N > ' + str(thresh_n) + ', nclust =' + str(np.max(clust_IDs)+1))
-x = plt.imshow(reresorted_data, cmap='cividis', clim=[0.6,1])
-plt.colorbar(shrink=0.5,aspect=8,ticks=[0.6,1])
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-x.axes.get_yaxis().set_ticklabels(resorted_types);
-x.axes.get_xaxis().set_ticks([])
-plt.subplot(2,4,5)
-plt.title('Cluster-mirrored PC space distance')
-x = plt.imshow(reresorted_mirror, cmap='pink', clim=[10,80])
-plt.colorbar(shrink=0.5,aspect=8,ticks=[10,45,80])
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-x.axes.get_yaxis().set_ticklabels(resorted_types);
-x.axes.get_xaxis().set_ticks([])
-
-# CLUSTER BLOCK
-# define matrix to cluster on
-input_matrix = thresh_pc_dists_table
-input_labels = thresh_cnx_dist_types
-mirror_matrix = thresh_cnx_dist_mat
-# train and fit the agglomerative/KMeans clustering model
-clust_model = AgglomerativeClustering(n_clusters=nclusts)
-clust_IDs = clust_model.fit_predict(input_matrix)
-# reorganize the distances matrix by cluster. within each cluster, sort cell types by mean distance, from closest to furthest
-resorted_data = np.zeros(input_matrix.shape[0]).reshape(1,-1)
-resorted_mirror = np.zeros(mirror_matrix.shape[0]).reshape(1,-1)
-resorted_types = np.full(1,'',dtype='<U32')
-for clust in range(0,np.max(clust_IDs)+1):
-    clust_sortinds = np.argsort(np.mean(np.abs(input_matrix[clust_IDs==clust,:]),axis=1))
-    resorted_mirror = np.append(resorted_mirror, mirror_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-    resorted_data = np.append(resorted_data, input_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-    resorted_types = np.append(resorted_types, input_labels[clust_IDs==clust][clust_sortinds])
-# trim initialization axis
-resorted_mirror = resorted_mirror[1:,:]
-resorted_data = resorted_data[1:,:]
-resorted_types = resorted_types[1:]
-# repeat to sort matrix columns
-reresorted_data = np.zeros(resorted_data.shape[0]).reshape(-1,1)
-reresorted_mirror = np.zeros(resorted_mirror.shape[0]).reshape(-1,1)
-for clust in range(0,np.max(clust_IDs)+1):
-    clust_sortinds = np.argsort(np.mean(np.abs(resorted_data[:,clust_IDs==clust]),axis=0))
-    reresorted_mirror = np.append(reresorted_mirror, resorted_mirror[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-    reresorted_data = np.append(reresorted_data, resorted_data[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-reresorted_data = reresorted_data[:,1:]
-reresorted_mirror = reresorted_mirror[:,1:]
-# plotting
-plt.subplot(2,4,2)
-plt.title('Cluster-mirrored FAFB connection distance')
-x = plt.imshow(reresorted_mirror, cmap='cividis', clim=[0.6,1])
-plt.colorbar(shrink=0.5,aspect=8,ticks=[0.6,1])
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-x.axes.get_yaxis().set_ticklabels(resorted_types);
-x.axes.get_xaxis().set_ticks([])
-plt.subplot(2,4,6)
-plt.title('PC space distance, N > ' + str(thresh_n) + ', nclust =' + str(np.max(clust_IDs)+1))
-x = plt.imshow(reresorted_data, cmap='pink', clim=[10,80])
-plt.colorbar(shrink=0.5,aspect=8,ticks=[10,45,80])
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-x.axes.get_yaxis().set_ticklabels(resorted_types);
-x.axes.get_xaxis().set_ticks([])
-
-# save it
-plt.suptitle('Connectome-physiology similarity for cell types @ N >' + str(thresh_n))
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/cnx-phys similarity(THRESH_N=' + str(thresh_n) + ').pdf'
-similarityfig.savefig(fname, format='pdf', orientation='landscape')
-
-# %% caclulate distribution of FWHM
-fwhmfig = plt.figure(figsize=(18,12))
-
-plt.subplot(2,1,1)
-x = plt.imshow(-1*binned_matrix.T, cmap='bone', origin='lower')
-plt.colorbar(shrink=0.5,aspect=8)
-# set ticks
-np.arange(0,len(np.arange(0,83,3)),1)
-x.axes.get_yaxis().set_ticks(np.arange(0,len(np.arange(0,83,3)),8))
-x.axes.get_yaxis().set_ticklabels(np.arange(0,83,24));
-x.axes.get_xaxis().set_ticks(np.arange(0,len(np.arange(0,1.015,0.015)),10))
-x.axes.get_xaxis().set_ticklabels(np.round(np.arange(0,1.015,0.15),2));
-
-# populate vector with fwhm for phys and conn in units of bins
-fwhm_phys = np.zeros(binned_matrix.shape[0])
-for n in range(0,binned_matrix.shape[0]):
-    current_vec = binned_matrix[n,:]
-    if np.any(current_vec):
-        # find # of bins with values larger than half the max value
-        fwhm_phys[n] = len(np.where(current_vec > np.max(current_vec)/2)[0])
-fwhm_conn = np.zeros(binned_matrix.shape[1])
-for n in range(0,binned_matrix.shape[1]):
-    current_vec = binned_matrix[:,n]
-    if np.any(current_vec):
-        # find # of bins with values larger than half the max value
-        fwhm_conn[n] = len(np.where(current_vec > np.max(current_vec)/2)[0])
-
-# convert bin units to actual D values by multiplying by bin width. phys needs an additional correction to 0-1 scale by dividing by 80
-fwhm_conn = fwhm_conn*0.015
-fwhm_phys = fwhm_phys*3/80
-
-# remove zeros to retain only bins with data
-fwhm_conn = fwhm_conn[np.nonzero(fwhm_conn)]
-fwhm_phys = fwhm_phys[np.nonzero(fwhm_phys)]
-
-# plotting
-plt.subplot(2,1,2)
-# plt.violinplot(fwhm_conn, positions=[1], widths=0.9, showextrema=False)
-# plt.violinplot(fwhm_phys, positions=[2], widths=0.9, showextrema=False)
-plt.boxplot(fwhm_conn, positions=[1], widths=0.6, showcaps=False)
-plt.boxplot(fwhm_phys, positions=[2], widths=0.6, showcaps=False)
-# plt.scatter(np.zeros(len(fwhm_conn))+1, fwhm_conn, color=[0,0,0], s=20)
-# plt.scatter(np.zeros(len(fwhm_phys))+2, fwhm_phys, color=[0,0,0], s=20)
-# stats
-res = stats.mannwhitneyu(fwhm_conn,fwhm_phys)
-plt.text(0.8,0.25,'p = ' + str(np.round(res.pvalue,5)))
-# plotprops
-plt.title('FW@HM of binned distances')
-plt.ylim(0,0.4)
-
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/cnx-phys distances fwhm analysis.pdf'
-fwhmfig.savefig(fname, format='pdf', orientation='landscape')
-
-#%% NOT USED
-# cluster on pc distance, apply to clusters to connection table (can we see common input cell types to specific clusters?)
-
-commoninputfig = plt.figure(figsize=(18, 15))
-
-# PLOT CONNECTION MATRIX
-plt.subplot(2,2,1)
-plt.title('Connectivity Matrix')
-plt.ylabel('Presynaptic Cell')
-plt.xlabel('Postsynaptic Cell')
-x = plt.imshow(infrac_data, cmap='bwr', clim=[-75,75])
-# blank ticks
-x.axes.get_xaxis().set_ticks([])
-x.axes.get_yaxis().set_ticks([])
-plt.colorbar(ticks=[-75,-50,-25,0,25,50,75],)
-
-# CLUSTER BLOCK
-# define matrix to cluster on
-input_matrix = thresh_pc_dists_table
-input_labels = thresh_cnx_dist_types
-mirror_matrix = infrac_data
-# train and fit the agglomerative/KMeans clustering model
-clust_model = AgglomerativeClustering(n_clusters=nclusts)
-clust_IDs = clust_model.fit_predict(input_matrix)
-# reorganize the distances matrix by cluster. within each cluster, sort cell types by mean distance, from closest to furthest
-resorted_data = np.zeros(input_matrix.shape[0]).reshape(1,-1)
-resorted_types = np.full(1,'',dtype='<U32')
-for clust in range(0,np.max(clust_IDs)+1):
-    clust_sortinds = np.argsort(np.mean(np.abs(input_matrix[clust_IDs==clust,:]),axis=1))
-    # only need to mirror the second dimension here (since the infrac table is not mirror symmetric)
-    resorted_data = np.append(resorted_data, input_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-    resorted_types = np.append(resorted_types, input_labels[clust_IDs==clust][clust_sortinds])
-# trim initialization axis
-resorted_data = resorted_data[1:,:]
-resorted_types = resorted_types[1:]
-# repeat to sort matrix columns
-reresorted_data = np.zeros(resorted_data.shape[0]).reshape(-1,1)
-reresorted_mirror = np.zeros(mirror_matrix.shape[0]).reshape(-1,1)
-for clust in range(0,np.max(clust_IDs)+1):
-    clust_sortinds = np.argsort(np.mean(np.abs(resorted_data[:,clust_IDs==clust]),axis=0))
-    reresorted_mirror = np.append(reresorted_mirror, mirror_matrix[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-    reresorted_data = np.append(reresorted_data, resorted_data[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-reresorted_data = reresorted_data[:,1:]
-reresorted_mirror = reresorted_mirror[:,1:]
-# plotting
-plt.subplot(2,2,2)
-plt.title('Cluster-mirrored connection table')
-plt.ylabel('Presynaptic Cell')
-plt.xlabel('Resorted Postsynaptic Cells')
-x = plt.imshow(reresorted_mirror, cmap='bwr', clim=[-75,75])
-plt.plot([len(clust_IDs[clust_IDs<1])-0.5,len(clust_IDs[clust_IDs<1])-0.5],[-0.5,48.5],'k-',linewidth=0.5)
-plt.plot([len(clust_IDs[clust_IDs<2])-0.5,len(clust_IDs[clust_IDs<2])-0.5],[-0.5,48.5],'k-',linewidth=0.5)
-plt.plot([len(clust_IDs[clust_IDs<3])-0.5,len(clust_IDs[clust_IDs<3])-0.5],[-0.5,48.5],'k-',linewidth=0.5)
-plt.plot([len(clust_IDs[clust_IDs<4])-0.5,len(clust_IDs[clust_IDs<4])-0.5],[-0.5,48.5],'k-',linewidth=0.5)
-# set ticks
-x.axes.get_xaxis().set_ticks([])
-x.axes.get_yaxis().set_ticks(np.arange(0,len(infrac_types),1))
-x.axes.get_yaxis().set_ticklabels(infrac_types);
-plt.colorbar(ticks=[-75,-50,-25,0,25,50,75],)
-plt.subplot(2,2,3)
-plt.title('Binarized Cluster-mirrored connection table')
-plt.ylabel('Presynaptic Cell')
-plt.xlabel('Resorted Postsynaptic Cells')
-x = plt.imshow(reresorted_mirror, cmap='bwr', clim=[-0.1,0.1])
-plt.plot([len(clust_IDs[clust_IDs<1])-0.5,len(clust_IDs[clust_IDs<1])-0.5],[-0.5,48.5],'k-')
-plt.plot([len(clust_IDs[clust_IDs<2])-0.5,len(clust_IDs[clust_IDs<2])-0.5],[-0.5,48.5],'k-')
-plt.plot([len(clust_IDs[clust_IDs<3])-0.5,len(clust_IDs[clust_IDs<3])-0.5],[-0.5,48.5],'k-')
-plt.plot([len(clust_IDs[clust_IDs<4])-0.5,len(clust_IDs[clust_IDs<4])-0.5],[-0.5,48.5],'k-')
-# set ticks
-x.axes.get_xaxis().set_ticks([])
-x.axes.get_yaxis().set_ticks(np.arange(0,len(infrac_types),1))
-x.axes.get_yaxis().set_ticklabels(infrac_types);
-plt.colorbar()
-plt.subplot(2,2,4)
-plt.title('PC space distance, N > ' + str(thresh_n) + ', nclust =' + str(np.max(clust_IDs)+1))
-x = plt.imshow(reresorted_data, cmap='pink', clim=[10,80])
-plt.colorbar(shrink=0.5,aspect=8,ticks=[10,45,80])
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-x.axes.get_yaxis().set_ticklabels(resorted_types);
-x.axes.get_xaxis().set_ticks([])
-
-# save it
-fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/all cell summaries/common inputs to functional clusters.pdf'
-commoninputfig.savefig(fname, format='pdf', orientation='landscape')
-
-#%% NOT USED
-# clustering of sub-threshold (weak) inputs
-from sklearn.cluster import AffinityPropagation
-infrac_thresh = 2
-
-for n in range(0,len(infrac_types)):
-    clustfig = plt.figure(figsize=(15, 6))
-    post_type = infrac_types[n]
-
-    # define index of post-synaptic cell type, as well as identity of pre-synaptic partners
-    # post_index = np.where(infrac_types==post_type)[0][0]
-    post_index = n
-    input_types = infrac_types[np.nonzero(infrac_data[:,post_index])]
-
-    # gather only rows pre-synaptic to post_type into a sub-table
-    input_cTRF_corrs = cTRF_corrs_table[:,np.nonzero(infrac_data[:,post_index])[0]][np.nonzero(infrac_data[:,post_index])[0],:]
-    input_flick_corrs = flick_corrs_table[:,np.nonzero(infrac_data[:,post_index])[0]][np.nonzero(infrac_data[:,post_index])[0],:]
-    input_pc_dists = pc_dists_table[:,np.nonzero(infrac_data[:,post_index])[0]][np.nonzero(infrac_data[:,post_index])[0],:]
-
-    # define input weights, ignoring synapse sign
-    input_weights = infrac_data[:,post_index][np.nonzero(infrac_data[:,post_index])]
-    abs_weights = np.abs(input_weights)
-
-    # threshold data table
-    wk_input_types = input_types[abs_weights < infrac_thresh]
-    wk_cTRF = input_cTRF_corrs[:,abs_weights < infrac_thresh][abs_weights < infrac_thresh,:]
-    wk_flick = input_flick_corrs[:,abs_weights < infrac_thresh][abs_weights < infrac_thresh,:]
-    wk_pc = input_pc_dists[:,abs_weights < infrac_thresh][abs_weights < infrac_thresh,:]
-
-    # overwrite diagonal nans with 1's for clustering (only needed for correlation tables)
-    np.fill_diagonal(wk_cTRF,1)
-    np.fill_diagonal(wk_flick,1)
-
-    try:
-        # CLUSTER BLOCK
-        # define matrix to cluster on
-        input_matrix = wk_cTRF
-        input_labels = wk_input_types
-        # train and fit the agglomerative clustering model
-        clust_model = AffinityPropagation(max_iter=500, convergence_iter=25, random_state=0)
-        clust_IDs = clust_model.fit_predict(input_matrix)
-        # reorganize the correlation matrix by cluster. within each cluster, sort cell types by mean absolute correlation strength, from strongest to weakest
-        resorted_data = np.zeros(input_matrix.shape[0]).reshape(1,-1)
-        resorted_types = np.full(1,'',dtype='<U32')
-        for clust in range(0,np.max(clust_IDs)+1):
-            clust_sortinds = np.argsort(-1*np.mean(np.abs(input_matrix[clust_IDs==clust,:]),axis=1))
-            resorted_data = np.append(resorted_data, input_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-            resorted_types = np.append(resorted_types, input_labels[clust_IDs==clust][clust_sortinds])
-        # trim initialization axis
-        resorted_data = resorted_data[1:,:]
-        resorted_types = resorted_types[1:]
-        # repeat to sort matrix columns
-        reresorted_data = np.zeros(resorted_data.shape[0]).reshape(-1,1)
-        for clust in range(0,np.max(clust_IDs)+1):
-            clust_sortinds = np.argsort(-1*np.mean(np.abs(resorted_data[:,clust_IDs==clust]),axis=0))
-            reresorted_data = np.append(reresorted_data, resorted_data[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-        reresorted_data = reresorted_data[:,1:]
-        # plotting
-        plt.subplot(1,3,1)
-        plt.title('Center TRF R, thresh = ' + str(infrac_thresh) + ', nclust =' + str(np.max(clust_IDs)+1))
-        x = plt.imshow(-1*reresorted_data, cmap='PuOr', clim=(-1,1))
-        plt.colorbar(shrink=0.5,aspect=8,ticks=[-1,0,1])
-        # set ticks
-        x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-        x.axes.get_yaxis().set_ticklabels(resorted_types);
-        x.axes.get_xaxis().set_ticks([])
-
-        # CLUSTER BLOCK
-        # define matrix to cluster on
-        input_matrix = wk_flick
-        input_labels = wk_input_types
-        # train and fit the agglomerative clustering model
-        clust_model = AffinityPropagation(max_iter=500, convergence_iter=25, random_state=0)
-        clust_IDs = clust_model.fit_predict(input_matrix)
-        # reorganize the correlation matrix by cluster. within each cluster, sort cell types by mean absolute correlation strength, from strongest to weakest
-        resorted_data = np.zeros(input_matrix.shape[0]).reshape(1,-1)
-        resorted_types = np.full(1,'',dtype='<U32')
-        for clust in range(0,np.max(clust_IDs)+1):
-            clust_sortinds = np.argsort(-1*np.mean(np.abs(input_matrix[clust_IDs==clust,:]),axis=1))
-            resorted_data = np.append(resorted_data, input_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-            resorted_types = np.append(resorted_types, input_labels[clust_IDs==clust][clust_sortinds])
-        # trim initialization axis
-        resorted_data = resorted_data[1:,:]
-        resorted_types = resorted_types[1:]
-        # repeat to sort matrix columns
-        reresorted_data = np.zeros(resorted_data.shape[0]).reshape(-1,1)
-        for clust in range(0,np.max(clust_IDs)+1):
-            clust_sortinds = np.argsort(-1*np.mean(np.abs(resorted_data[:,clust_IDs==clust]),axis=0))
-            reresorted_data = np.append(reresorted_data, resorted_data[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-        reresorted_data = reresorted_data[:,1:]
-        # plotting
-        plt.subplot(1,3,2)
-        plt.title('Flicker R, thresh = ' + str(infrac_thresh) + ', nclust =' + str(np.max(clust_IDs)+1))
-        x = plt.imshow(-1*reresorted_data, cmap='PuOr', clim=(-1,1))
-        plt.colorbar(shrink=0.5,aspect=8,ticks=[-1,0,1])
-        # set ticks
-        x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-        x.axes.get_yaxis().set_ticklabels(resorted_types);
-        x.axes.get_xaxis().set_ticks([])
-
-        # CLUSTER BLOCK
-        # define matrix to cluster on
-        input_matrix = wk_pc
-        input_labels = wk_input_types
-        # train and fit the agglomerative clustering model
-        clust_model = AffinityPropagation(max_iter=500, convergence_iter=25, random_state=0)
-        clust_IDs = clust_model.fit_predict(input_matrix)
-        # reorganize the distances matrix by cluster. within each cluster, sort cell types by mean distance, from closest to furthest
-        resorted_data = np.zeros(input_matrix.shape[0]).reshape(1,-1)
-        resorted_types = np.full(1,'',dtype='<U32')
-        for clust in range(0,np.max(clust_IDs)+1):
-            clust_sortinds = np.argsort(np.mean(np.abs(input_matrix[clust_IDs==clust,:]),axis=1))
-            resorted_data = np.append(resorted_data, input_matrix[clust_IDs==clust,:][clust_sortinds,:], axis=0)
-            resorted_types = np.append(resorted_types, input_labels[clust_IDs==clust][clust_sortinds])
-        # trim initialization axis
-        resorted_data = resorted_data[1:,:]
-        resorted_types = resorted_types[1:]
-        # repeat to sort matrix columns
-        reresorted_data = np.zeros(resorted_data.shape[0]).reshape(-1,1)
-        for clust in range(0,np.max(clust_IDs)+1):
-            clust_sortinds = np.argsort(np.mean(np.abs(resorted_data[:,clust_IDs==clust]),axis=0))
-            reresorted_data = np.append(reresorted_data, resorted_data[:,clust_IDs==clust][:,clust_sortinds], axis=1)
-        reresorted_data = reresorted_data[:,1:]
-        # plotting
-        plt.subplot(1,3,3)
-        plt.title('PC space distance, thresh = ' + str(infrac_thresh) + ', nclust =' + str(np.max(clust_IDs)+1))
-        x = plt.imshow(reresorted_data, cmap='pink', clim=[5,65])
-        plt.colorbar(shrink=0.5,aspect=8,ticks=[5,35,65])
-        # set ticks
-        x.axes.get_yaxis().set_ticks(np.arange(0,len(resorted_types),1))
-        x.axes.get_yaxis().set_ticklabels(resorted_types);
-        x.axes.get_xaxis().set_ticks([])
-
-        # save it
-        plt.suptitle('Similarity among weak inputs to ' + post_type)
-        fname = '/Users/tcurrier/Desktop/Clandinin Lab/Imaging/medulla project/label summaries/similarity among weak inputs/' + post_type + '.pdf'
-        clustfig.savefig(fname, format='pdf', orientation='landscape')
-        plt.close()
-    except:
-        print('No weak inputs found for ' + post_type)
-
-
-#%% UNUSED IN PAPER - - covariance matrices among presynaptic cell types for given post-synaptic type
-
-post_type = 'T2a'
-
-# define index of post-synaptic cell type, as well as identity og pre-synaptic partners
-post_index = np.where(infrac_types==post_type)[0][0]
-input_types = infrac_types[np.nonzero(infrac_data[:,post_index])]
-
-# gather only rows pre-synaptic to post_type into a sub-table
-input_cTRF_corrs = cTRF_corrs_table[:,np.nonzero(infrac_data[:,post_index])[0]][np.nonzero(infrac_data[:,post_index])[0],:]
-input_flick_corrs = flick_corrs_table[:,np.nonzero(infrac_data[:,post_index])[0]][np.nonzero(infrac_data[:,post_index])[0],:]
-
-# split rows by E/I, then rank by input weight
-input_weights = infrac_data[:,post_index][np.nonzero(infrac_data[:,post_index])]
-abs_weights = np.abs(input_weights)
-cTRF_e = input_cTRF_corrs[input_weights > 0,:][:,input_weights > 0]
-cTRF_i = input_cTRF_corrs[input_weights < 0,:][:,input_weights < 0]
-flick_e = input_flick_corrs[input_weights > 0,:][:,input_weights > 0]
-flick_i = input_flick_corrs[input_weights < 0,:][:,input_weights < 0]
-e_weights = abs_weights[input_weights > 0]
-i_weights = abs_weights[input_weights < 0]
-sorted_cTRF_e = cTRF_e[np.argsort(e_weights),:][:,np.argsort(e_weights)]
-sorted_cTRF_i = cTRF_i[np.argsort(i_weights),:][:,np.argsort(i_weights)]
-sorted_flick_e = flick_e[np.argsort(e_weights),:][:,np.argsort(e_weights)]
-sorted_flick_i = flick_i[np.argsort(i_weights),:][:,np.argsort(i_weights)]
-
-# overwrite diagonal nans with 1's for clustering
-np.fill_diagonal(sorted_cTRF_e,1)
-np.fill_diagonal(sorted_cTRF_i,1)
-np.fill_diagonal(sorted_flick_e,1)
-np.fill_diagonal(sorted_flick_i,1)
-
-# sort cell type identities
-e_types = input_types[input_weights > 0]
-i_types = input_types[input_weights < 0]
-sorted_e_types = e_types[np.argsort(e_weights)]
-sorted_i_types = i_types[np.argsort(i_weights)]
-
-
-incorrfig = plt.figure(figsize=(12, 12))
-plt.subplot(2,2,1)
-plt.title('Center TRF, Excitatory Inputs')
-x = plt.imshow(-1*sorted_cTRF_e, cmap='PuOr', clim=(-1,1))
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(sorted_e_types),1))
-x.axes.get_yaxis().set_ticklabels(sorted_e_types);
-x.axes.get_xaxis().set_ticks([])
-plt.ylabel('Weight-Ranked Inputs')
-plt.subplot(2,2,2)
-plt.title('Center TRF, Inhibitory Inputs')
-x = plt.imshow(-1*sorted_cTRF_i, cmap='PuOr', clim=(-1,1))
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(sorted_i_types),1))
-x.axes.get_yaxis().set_ticklabels(sorted_i_types);
-x.axes.get_xaxis().set_ticks([])
-plt.ylabel('Weight-Ranked Inputs')
-plt.subplot(2,2,3)
-plt.title('Flicker, Excitatory Inputs')
-x = plt.imshow(-1*sorted_flick_e, cmap='PuOr', clim=(-1,1))
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(sorted_e_types),1))
-x.axes.get_yaxis().set_ticklabels(sorted_e_types);
-x.axes.get_xaxis().set_ticks([])
-plt.ylabel('Weight-Ranked Inputs')
-plt.subplot(2,2,4)
-plt.title('Flicker, Inhibitory Inputs')
-x = plt.imshow(-1*sorted_flick_i, cmap='PuOr', clim=(-1,1))
-# set ticks
-x.axes.get_yaxis().set_ticks(np.arange(0,len(sorted_i_types),1))
-x.axes.get_yaxis().set_ticklabels(sorted_i_types);
-x.axes.get_xaxis().set_ticks([])
-plt.ylabel('Weight-Ranked Inputs')

@@ -1,4 +1,4 @@
-Code base for "Infrequent strong connections constrain connectomic predictions of neuronal function" by TA Currier and TR Clandinin, 2025. Please direct all questions or comments to Tim (currier@stanford.edu).
+Code base for "Infrequent strong connections constrain connectomic predictions of neuronal function" by TA Currier and TR Clandinin, *Cell*, 2025. Please direct all questions or comments to Tim (currier@stanford.edu).
 
 # Contents
 
@@ -10,9 +10,9 @@ Code base for "Infrequent strong connections constrain connectomic predictions o
 A few helper functions for interacting with .hdf5 metadata files
 
 ## Scripts
-- The core analysis code for the manuscript lives in the scripts beginning with `ME_`. Please note that some of these scripts will require the connectome data deposited with the physiology data on Dryad.
+- The core analysis code for the manuscript lives in the scripts beginning with `ME_`. Please note that some of these scripts will require the connectome data deposited with the physiology data on Dryad (see **Raw Data Availability**, below)
 - `recover_isotropy.py` and `var_brain.py` are not run in any `ME_` scripts, but are included for completeness - these are run as part of the preprocessing pipeline that also includes motion correction (performed with [brainsss](https://github.com/ClandininLab/brainsss))
-- `save_strfs.py` is a callable script that can be used to create STRF movies for a given recording series - the raw data must be downloaded to create these movies
+- `save_strfs.py` is a callable script that creates STRF movies for a given recording series
 - **WARNING!** The path structure of the included scripts are **not** internally consistent, and will need to be renamed based on the location you put each element (raw data, scripts, logs, connectome data, saved .npy summary variables)
 
 # Required packages

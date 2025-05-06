@@ -1,3 +1,5 @@
+# This script loads saved STRF data and performs center of mass alignment for each ROI. Also saves a separate summary file with centered and rotated data (used for PCA). Rotations align an STRF's long axis horizontally, with a precision of +/- 22.5º. The same transform is applied to both the blue and UV STRFs for a given ROI. Finally, an ellipse is fitted to each centered STRF.
+
 from visanalysis.analysis import imaging_data, shared_analysis
 from tac_util import tac_h5_tools
 import numpy as np
