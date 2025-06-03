@@ -1,4 +1,4 @@
-Code base for "Infrequent strong connections constrain connectomic predictions of neuronal function" by TA Currier and TR Clandinin, *Cell*, 2025. Please direct all questions or comments to Tim (currier@stanford.edu). Readers seeking to download visual response data for all recorded cell types should download `ALL_RESPONSES.npy` [here](10.5061/dryad.pg4f4qs1j).
+Code base for "Infrequent strong connections constrain connectomic predictions of neuronal function" by TA Currier and TR Clandinin, *Cell*, 2025. Please direct all questions or comments to Tim (currier@stanford.edu). ~~Readers seeking to download visual response data for all recorded cell types should download `ALL_RESPONSES.npy` [here](10.5061/dryad.pg4f4qs1j).~~ Please note that our Dryad depositions are currently held up in the curation process and hosting for the raw data is not yet available. We do not expect this to take too much longer, but I will try to accomodate urgent requests for the `ALL_RESPONSES.npy` file through another hosting medium if you send me an email at timothy.currier@gmail.com. Apologies for the trouble!
 
 # Contents
 
